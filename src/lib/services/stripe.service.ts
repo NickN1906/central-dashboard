@@ -8,13 +8,21 @@ import {
 } from './entitlements.service'
 import { DurationType } from '@/lib/types'
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY is not set')
+let _stripe: Stripe | null = null
+
+function getStripe(): Stripe {
+  if (!_stripe) {
+    if (!process.env.STRIPE_SECRET_KEY) {
+      throw new Error('STRIPE_SECRET_KEY is not set')
+    }
+    _stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2025-12-15.clover'
+    })
+  }
+  return _stripe
 }
 
-export const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2025-12-15.clover'
-})
+export const stripe = { get instance() { return getStripe() } }
 
 /**
  * Verify Stripe webhook signature
@@ -27,7 +35,7 @@ export function verifyWebhookSignature(
     throw new Error('STRIPE_WEBHOOK_SECRET is not set')
   }
 
-  return stripe.webhooks.constructEvent(
+  return stripe.instance.webhooks.constructEvent(
     payload,
     signature,
     process.env.STRIPE_WEBHOOK_SECRET
@@ -48,7 +56,7 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   }
 
   // Get line items to find the price ID
-  const lineItems = await stripe.checkout.sessions.listLineItems(session.id, {
+  const lineItems = await stripe.instance.checkout.sessions.listLineItems(session.id, {
     limit: 1
   })
 
