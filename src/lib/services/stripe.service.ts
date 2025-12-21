@@ -1,4 +1,5 @@
 import Stripe from 'stripe'
+import { Prisma } from '@prisma/client'
 import prisma from '@/lib/db'
 import {
   getOrCreateIdentity,
@@ -78,7 +79,7 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   const productsWithForms = await prisma.product.findMany({
     where: {
       id: { in: bundle.productIds },
-      formSchema: { not: null }
+      NOT: { formSchema: { equals: Prisma.DbNull } }
     }
   })
 
