@@ -1,0 +1,219 @@
+// Central Entitlements Service - Database Schema
+// Manages access across multiple products (Rezume, AI Coach, Career Pathways)
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// PRODUCTS TABLE
+// Define what products exist in your ecosystem
+// ============================================
+model Product {
+  id                    String   @id // 'rezume', 'coach', 'career'
+  name                  String   // 'Rezume Pro'
+  description           String?
+  appUrl                String?  @map("app_url")
+  requiresOngoingAccess Boolean  @default(true) @map("requires_ongoing_access")
+  formSchema            Json?    @map("form_schema") // Form fields for products like Career Pathways
+  zapierWebhookUrl      String?  @map("zapier_webhook_url")
+  isActive              Boolean  @default(true) @map("is_active")
+  displayOrder          Int      @default(0) @map("display_order")
+  createdAt             DateTime @default(now()) @map("created_at")
+  updatedAt             DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  identityEmails     IdentityEmail[]
+  entitlements       Entitlement[]
+  productSubmissions ProductSubmission[]
+
+  @@map("products")
+}
+
+// ============================================
+// BUNDLES TABLE
+// Configure which products go together
+// ============================================
+model Bundle {
+  id            Int      @id @default(autoincrement())
+  name          String   // 'Ultimate Career Bundle'
+  slug          String   @unique // 'ultimate-bundle'
+  description   String?
+  stripePriceId String   @unique @map("stripe_price_id") // Links to Stripe
+  productIds    String[] @map("product_ids") // ['rezume', 'coach', 'career']
+  durationType  String   @default("lifetime") @map("duration_type") // 'days', 'months', 'years', 'lifetime'
+  durationValue Int?     @map("duration_value") // e.g., 3 for 3 months
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  claimTokens  ClaimToken[]
+  entitlements Entitlement[]
+
+  @@map("bundles")
+}
+
+// ============================================
+// IDENTITIES TABLE
+// User identities (can have multiple emails)
+// ============================================
+model Identity {
+  id               String   @id @default(cuid())
+  primaryEmail     String   @map("primary_email") // Purchase email
+  stripeCustomerId String?  @unique @map("stripe_customer_id")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  // Relations
+  emails             IdentityEmail[]
+  entitlements       Entitlement[]
+  claimTokens        ClaimToken[]
+  productSubmissions ProductSubmission[]
+
+  @@map("identities")
+}
+
+// ============================================
+// IDENTITY EMAILS TABLE
+// Multiple emails linked to one identity
+// ============================================
+model IdentityEmail {
+  id         Int      @id @default(autoincrement())
+  identityId String   @map("identity_id")
+  email      String
+  productId  String   @map("product_id") // Which product this email is for
+  verified   Boolean  @default(true)
+  addedAt    DateTime @default(now()) @map("added_at")
+
+  // Relations
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@unique([email, productId])
+  @@index([email])
+  @@map("identity_emails")
+}
+
+// ============================================
+// ENTITLEMENTS TABLE
+// What products an identity has access to
+// ============================================
+model Entitlement {
+  id                   Int       @id @default(autoincrement())
+  identityId           String    @map("identity_id")
+  productId            String    @map("product_id")
+  source               String    // 'bundle', 'individual', 'promo', 'manual'
+  bundleId             Int?      @map("bundle_id")
+  stripeSubscriptionId String?   @map("stripe_subscription_id")
+  grantedAt            DateTime  @default(now()) @map("granted_at")
+  expiresAt            DateTime? @map("expires_at") // NULL = never expires
+  revokedAt            DateTime? @map("revoked_at")
+  revokedReason        String?   @map("revoked_reason")
+
+  // Relations
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+  bundle   Bundle?  @relation(fields: [bundleId], references: [id])
+
+  @@unique([identityId, productId])
+  @@index([identityId])
+  @@map("entitlements")
+}
+
+// ============================================
+// CLAIM TOKENS TABLE
+// Tokens for bundle activation
+// ============================================
+model ClaimToken {
+  token           String    @id
+  identityId      String    @map("identity_id")
+  bundleId        Int       @map("bundle_id")
+  purchaseEmail   String    @map("purchase_email")
+  stripeSessionId String?   @map("stripe_session_id")
+  claimed         Boolean   @default(false)
+  claimedAt       DateTime? @map("claimed_at")
+  expiresAt       DateTime  @map("expires_at") // Token expiry (e.g., 30 days)
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  bundle   Bundle   @relation(fields: [bundleId], references: [id])
+
+  @@index([token])
+  @@map("claim_tokens")
+}
+
+// ============================================
+// PRODUCT SUBMISSIONS TABLE
+// Form data for products like Career Pathways
+// ============================================
+model ProductSubmission {
+  id              Int       @id @default(autoincrement())
+  identityId      String    @map("identity_id")
+  productId       String    @map("product_id")
+  formData        Json      @map("form_data")
+  zapierTriggered Boolean   @default(false) @map("zapier_triggered")
+  zapierResponse  Json?     @map("zapier_response")
+  createdAt       DateTime  @default(now()) @map("created_at")
+
+  // Relations
+  identity Identity @relation(fields: [identityId], references: [id], onDelete: Cascade)
+  product  Product  @relation(fields: [productId], references: [id])
+
+  @@map("product_submissions")
+}
+
+// ============================================
+// ADMIN USERS TABLE
+// ============================================
+model AdminUser {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  name         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@map("admin_users")
+}
+
+// ============================================
+// AUDIT LOGS TABLE
+// Track all actions for accountability
+// ============================================
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String   // 'grant', 'revoke', 'claim', 'manual_add', 'bundle_created', etc.
+  identityId String?  @map("identity_id")
+  productIds String[] @map("product_ids")
+  adminEmail String?  @map("admin_email")
+  details    Json?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([identityId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+// ============================================
+// WEBHOOK LOGS TABLE
+// Stripe webhook history for debugging
+// ============================================
+model WebhookLog {
+  id           Int      @id @default(autoincrement())
+  eventId      String   @unique @map("event_id")
+  eventType    String   @map("event_type")
+  payload      Json
+  status       String   // 'success', 'failed', 'ignored'
+  errorMessage String?  @map("error_message")
+  processedAt  DateTime @default(now()) @map("processed_at")
+
+  @@index([eventType])
+  @@map("webhook_logs")
+}
