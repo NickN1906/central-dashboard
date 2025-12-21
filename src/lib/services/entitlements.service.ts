@@ -1,6 +1,7 @@
 import prisma from '@/lib/db'
 import { calculateExpiryDate, DurationType } from '@/lib/types'
 import { nanoid } from 'nanoid'
+import { Prisma } from '@prisma/client'
 
 interface AccessResult {
   hasAccess: boolean
@@ -353,7 +354,7 @@ export async function processClaim(
         data: {
           identityId: identity.id,
           productId,
-          formData: productData.formData
+          formData: productData.formData as Prisma.InputJsonValue
         }
       })
     }
