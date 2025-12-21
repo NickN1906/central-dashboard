@@ -2,10 +2,19 @@ import prisma from '@/lib/db'
 import { calculateExpiryDate, DurationType } from '@/lib/types'
 import { nanoid } from 'nanoid'
 
+interface AccessResult {
+  hasAccess: boolean
+  product: string
+  source?: string
+  bundleName?: string
+  expires?: string | null
+  grantedAt?: string
+}
+
 /**
  * Check if an email has access to a specific product
  */
-export async function checkAccess(email: string, productId: string) {
+export async function checkAccess(email: string, productId: string): Promise<AccessResult> {
   // Find identity email for this product
   const identityEmail = await prisma.identityEmail.findUnique({
     where: {
@@ -62,7 +71,7 @@ function checkEntitlementAccess(
     bundle?: { name: string } | null
   },
   productId: string
-) {
+): AccessResult {
   // Check if revoked
   if (entitlement.revokedAt) {
     return { hasAccess: false, product: productId }
@@ -99,8 +108,8 @@ export async function getEntitlements(email: string) {
         id: product.id,
         name: product.name,
         hasAccess: access.hasAccess,
-        source: access.hasAccess ? access.source : undefined,
-        expires: access.hasAccess ? access.expires : undefined
+        source: access.source,
+        expires: access.expires
       }
     })
   )
