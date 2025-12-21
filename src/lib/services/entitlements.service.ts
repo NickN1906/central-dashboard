@@ -99,8 +99,8 @@ export async function getEntitlements(email: string) {
         id: product.id,
         name: product.name,
         hasAccess: access.hasAccess,
-        source: access.source,
-        expires: access.expires
+        source: access.hasAccess ? access.source : undefined,
+        expires: access.hasAccess ? access.expires : undefined
       }
     })
   )
