@@ -108,9 +108,13 @@ model Entitlement {
   id                   Int       @id @default(autoincrement())
   identityId           String    @map("identity_id")
   productId            String    @map("product_id")
-  source               String    // 'bundle', 'individual', 'promo', 'manual'
+  source               String    // 'bundle', 'direct', 'promo', 'manual'
+  sourceApp            String?   @map("source_app") // 'central', 'rezume', 'aicoach' - which app originated this
   bundleId             Int?      @map("bundle_id")
   stripeSubscriptionId String?   @map("stripe_subscription_id")
+  stripePriceId        String?   @map("stripe_price_id") // Track which price was purchased
+  amountPaid           Int?      @map("amount_paid") // Amount in cents for revenue tracking
+  currency             String?   // 'cad', 'usd', etc.
   grantedAt            DateTime  @default(now()) @map("granted_at")
   expiresAt            DateTime? @map("expires_at") // NULL = never expires
   revokedAt            DateTime? @map("revoked_at")
@@ -121,8 +125,9 @@ model Entitlement {
   product  Product  @relation(fields: [productId], references: [id])
   bundle   Bundle?  @relation(fields: [bundleId], references: [id])
 
-  @@unique([identityId, productId])
+  @@unique([identityId, productId, source, sourceApp], name: "unique_entitlement_per_source")
   @@index([identityId])
+  @@index([sourceApp])
   @@map("entitlements")
 }
 

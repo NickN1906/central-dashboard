@@ -127,45 +127,73 @@ export async function getEntitlements(email: string) {
 export async function grantAccess(params: {
   identityId: string
   productIds: string[]
-  source: 'bundle' | 'individual' | 'promo' | 'manual'
+  source: 'bundle' | 'direct' | 'promo' | 'manual'
+  sourceApp?: 'central' | 'rezume' | 'aicoach'
   bundleId?: number
   durationType?: DurationType
   durationValue?: number | null
   stripeSubscriptionId?: string
+  stripePriceId?: string
+  amountPaid?: number
+  currency?: string
 }) {
   const {
     identityId,
     productIds,
     source,
+    sourceApp = 'central',
     bundleId,
     durationType = 'lifetime',
     durationValue = null,
-    stripeSubscriptionId
+    stripeSubscriptionId,
+    stripePriceId,
+    amountPaid,
+    currency
   } = params
 
   const expiresAt = calculateExpiryDate(durationType, durationValue)
 
   const entitlements = await Promise.all(
     productIds.map(async (productId) => {
-      return prisma.entitlement.upsert({
+      // Use a composite key that includes source and sourceApp
+      // This allows multiple entitlements from different sources
+      const existingEntitlement = await prisma.entitlement.findFirst({
         where: {
-          identityId_productId: { identityId, productId }
-        },
-        create: {
           identityId,
           productId,
           source,
-          bundleId,
-          expiresAt,
-          stripeSubscriptionId
-        },
-        update: {
+          sourceApp
+        }
+      })
+
+      if (existingEntitlement) {
+        return prisma.entitlement.update({
+          where: { id: existingEntitlement.id },
+          data: {
+            bundleId,
+            expiresAt,
+            stripeSubscriptionId,
+            stripePriceId,
+            amountPaid,
+            currency,
+            revokedAt: null,
+            revokedReason: null
+          }
+        })
+      }
+
+      return prisma.entitlement.create({
+        data: {
+          identityId,
+          productId,
           source,
+          sourceApp,
           bundleId,
           expiresAt,
           stripeSubscriptionId,
-          revokedAt: null,
-          revokedReason: null
+          stripePriceId,
+          amountPaid,
+          currency
         }
       })
     })
@@ -177,11 +205,139 @@ export async function grantAccess(params: {
       action: 'grant',
       identityId,
       productIds,
-      details: { source, bundleId, expiresAt }
+      details: { source, sourceApp, bundleId, expiresAt, stripePriceId, amountPaid, currency }
     }
   })
 
   return entitlements
+}
+
+/**
+ * Report a subscription from an external app (Rezume, AI Coach)
+ * This is called when apps grant their own subscriptions
+ */
+export async function reportExternalSubscription(params: {
+  email: string
+  productId: string
+  action: 'grant' | 'revoke'
+  sourceApp: 'rezume' | 'aicoach'
+  stripeSubscriptionId?: string
+  stripePriceId?: string
+  amountPaid?: number
+  currency?: string
+  expiresAt?: Date
+  reason?: string
+}) {
+  const {
+    email,
+    productId,
+    action,
+    sourceApp,
+    stripeSubscriptionId,
+    stripePriceId,
+    amountPaid,
+    currency,
+    expiresAt,
+    reason
+  } = params
+
+  const normalizedEmail = email.toLowerCase()
+
+  // Get or create identity
+  const identity = await getOrCreateIdentity(normalizedEmail)
+
+  // Link email to identity for this product
+  await prisma.identityEmail.upsert({
+    where: {
+      email_productId: { email: normalizedEmail, productId }
+    },
+    create: {
+      identityId: identity.id,
+      email: normalizedEmail,
+      productId
+    },
+    update: {}
+  })
+
+  if (action === 'grant') {
+    // Find or create entitlement for this source
+    const existingEntitlement = await prisma.entitlement.findFirst({
+      where: {
+        identityId: identity.id,
+        productId,
+        source: 'direct',
+        sourceApp
+      }
+    })
+
+    if (existingEntitlement) {
+      await prisma.entitlement.update({
+        where: { id: existingEntitlement.id },
+        data: {
+          stripeSubscriptionId,
+          stripePriceId,
+          amountPaid,
+          currency,
+          expiresAt,
+          revokedAt: null,
+          revokedReason: null
+        }
+      })
+    } else {
+      await prisma.entitlement.create({
+        data: {
+          identityId: identity.id,
+          productId,
+          source: 'direct',
+          sourceApp,
+          stripeSubscriptionId,
+          stripePriceId,
+          amountPaid,
+          currency,
+          expiresAt
+        }
+      })
+    }
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        action: 'external_grant',
+        identityId: identity.id,
+        productIds: [productId],
+        details: { sourceApp, stripeSubscriptionId, stripePriceId, amountPaid, currency, expiresAt }
+      }
+    })
+
+    return { success: true, action: 'granted', sourceApp }
+  } else {
+    // Revoke - only revoke entitlements from this specific source
+    await prisma.entitlement.updateMany({
+      where: {
+        identityId: identity.id,
+        productId,
+        source: 'direct',
+        sourceApp,
+        ...(stripeSubscriptionId ? { stripeSubscriptionId } : {})
+      },
+      data: {
+        revokedAt: new Date(),
+        revokedReason: reason || `Revoked by ${sourceApp}`
+      }
+    })
+
+    // Log the action
+    await prisma.auditLog.create({
+      data: {
+        action: 'external_revoke',
+        identityId: identity.id,
+        productIds: [productId],
+        details: { sourceApp, reason, stripeSubscriptionId }
+      }
+    })
+
+    return { success: true, action: 'revoked', sourceApp }
+  }
 }
 
 /**
