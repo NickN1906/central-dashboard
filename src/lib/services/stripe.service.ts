@@ -7,6 +7,7 @@ import {
   grantAccess
 } from './entitlements.service'
 import { sendBundlePurchaseEmail } from './email.service'
+import { grantAccessAndSync, revokeAccessAndSync } from './app-sync.service'
 import { DurationType } from '@/lib/types'
 
 let _stripe: Stripe | null = null
@@ -130,12 +131,13 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
 
   // Calculate expiry date for email
   const expiresAt = new Date()
+  const durationValue = bundle.durationValue ?? 0
   if (bundle.durationType === 'days') {
-    expiresAt.setDate(expiresAt.getDate() + bundle.durationValue)
+    expiresAt.setDate(expiresAt.getDate() + durationValue)
   } else if (bundle.durationType === 'months') {
-    expiresAt.setMonth(expiresAt.getMonth() + bundle.durationValue)
+    expiresAt.setMonth(expiresAt.getMonth() + durationValue)
   } else if (bundle.durationType === 'years') {
-    expiresAt.setFullYear(expiresAt.getFullYear() + bundle.durationValue)
+    expiresAt.setFullYear(expiresAt.getFullYear() + durationValue)
   }
 
   await grantAccess({
@@ -156,11 +158,20 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     expiresAt: bundle.durationType !== 'lifetime' ? expiresAt : undefined
   })
 
+  // Sync access to connected apps (Rezume, AI Coach)
+  const syncResults = await grantAccessAndSync(
+    customerEmail,
+    bundle.productIds,
+    `Bundle purchase: ${bundle.name}`
+  )
+  console.log('[Stripe] App sync results:', syncResults)
+
   return {
     handled: true,
     action: 'access_granted',
     bundleName: bundle.name,
-    products: bundle.productIds
+    products: bundle.productIds,
+    syncResults
   }
 }
 
@@ -206,6 +217,14 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
       durationValue: bundle.durationValue,
       stripeSubscriptionId: subscription.id
     })
+
+    // Sync access to connected apps
+    const syncResults = await grantAccessAndSync(
+      identity.primaryEmail,
+      bundle.productIds,
+      `Subscription ${subscription.status}`
+    )
+    console.log('[Stripe] Subscription active sync results:', syncResults)
   } else if (
     subscription.status === 'canceled' ||
     subscription.status === 'unpaid' ||
@@ -225,6 +244,14 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
         }
       })
     }
+
+    // Sync revocation to connected apps
+    const syncResults = await revokeAccessAndSync(
+      identity.primaryEmail,
+      bundle.productIds,
+      `Subscription ${subscription.status}`
+    )
+    console.log('[Stripe] Revocation sync results:', syncResults)
   }
 
   return { handled: true }
@@ -246,6 +273,17 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
     return { handled: false }
   }
 
+  // Get entitlements to find product IDs before revoking
+  const entitlements = await prisma.entitlement.findMany({
+    where: {
+      identityId: identity.id,
+      stripeSubscriptionId: subscription.id
+    },
+    select: { productId: true }
+  })
+
+  const productIds = [...new Set(entitlements.map(e => e.productId))]
+
   // Revoke all entitlements linked to this subscription
   await prisma.entitlement.updateMany({
     where: {
@@ -257,6 +295,16 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
       revokedReason: 'Subscription deleted'
     }
   })
+
+  // Sync revocation to connected apps
+  if (productIds.length > 0) {
+    const syncResults = await revokeAccessAndSync(
+      identity.primaryEmail,
+      productIds,
+      'Subscription deleted'
+    )
+    console.log('[Stripe] Subscription deleted sync results:', syncResults)
+  }
 
   return { handled: true }
 }
