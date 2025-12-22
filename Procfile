@@ -1,2 +1,2 @@
 web: npm run start
-# release: npx prisma migrate deploy (temporarily disabled due to cold start timeout issues)
+release: npx prisma db push --accept-data-loss
