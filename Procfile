@@ -1,2 +1,3 @@
 web: npm run start
-release: npx prisma db push --accept-data-loss
+# Note: Run 'heroku run npx prisma db push' manually after schema changes
+# The release command times out due to Heroku DB cold start issues
