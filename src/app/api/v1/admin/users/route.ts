@@ -127,7 +127,7 @@ export async function POST(request: NextRequest) {
     const entitlements = await grantAccess({
       identityId: identity.id,
       productIds,
-      source: source as 'bundle' | 'individual' | 'promo' | 'manual',
+      source: source as 'bundle' | 'direct' | 'promo' | 'manual',
       durationType: durationType as DurationType,
       durationValue
     })

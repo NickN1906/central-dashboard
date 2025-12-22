@@ -167,7 +167,7 @@ export default function GrantPage() {
                 <SelectContent>
                   <SelectItem value="manual">Manual Grant</SelectItem>
                   <SelectItem value="promo">Promotion</SelectItem>
-                  <SelectItem value="individual">Individual Purchase</SelectItem>
+                  <SelectItem value="direct">Direct Purchase</SelectItem>
                 </SelectContent>
               </Select>
             </div>
