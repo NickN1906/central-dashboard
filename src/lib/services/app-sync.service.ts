@@ -17,14 +17,14 @@ const APP_CONFIG: Record<
     name: 'Rezume',
     baseUrl:
       process.env.REZUME_API_URL ||
-      'https://resume-builder-canada-8cba721a29e8.herokuapp.com',
+      'https://resume-builder-canada-9ee6ef699d83.herokuapp.com',
     productId: 'rezume',
   },
   aicoach: {
     name: 'AI Interview Coach',
     baseUrl:
       process.env.AICOACH_API_URL ||
-      'https://your-ai-interview-coach-1a43e5c7a178.herokuapp.com',
+      'https://your-ai-interview-coach-7f11f441a641.herokuapp.com',
     productId: 'aicoach',
   },
 }
