@@ -6,6 +6,7 @@ import {
   createClaimToken,
   grantAccess
 } from './entitlements.service'
+import { sendBundlePurchaseEmail } from './email.service'
 import { DurationType } from '@/lib/types'
 
 let _stripe: Stripe | null = null
@@ -127,6 +128,16 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     })
   }
 
+  // Calculate expiry date for email
+  const expiresAt = new Date()
+  if (bundle.durationType === 'days') {
+    expiresAt.setDate(expiresAt.getDate() + bundle.durationValue)
+  } else if (bundle.durationType === 'months') {
+    expiresAt.setMonth(expiresAt.getMonth() + bundle.durationValue)
+  } else if (bundle.durationType === 'years') {
+    expiresAt.setFullYear(expiresAt.getFullYear() + bundle.durationValue)
+  }
+
   await grantAccess({
     identityId: identity.id,
     productIds: bundle.productIds,
@@ -136,7 +147,14 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     durationValue: bundle.durationValue
   })
 
-  // TODO: Send confirmation email
+  // Send confirmation email with instructions
+  await sendBundlePurchaseEmail({
+    customerEmail,
+    customerName: session.customer_details?.name || undefined,
+    bundleName: bundle.name,
+    productIds: bundle.productIds,
+    expiresAt: bundle.durationType !== 'lifetime' ? expiresAt : undefined
+  })
 
   return {
     handled: true,
