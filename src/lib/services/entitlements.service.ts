@@ -15,6 +15,7 @@ interface AccessResult {
 
 /**
  * Check if an email has access to a specific product
+ * Filters to only check non-revoked, non-expired entitlements
  */
 export async function checkAccess(email: string, productId: string): Promise<AccessResult> {
   // Find identity email for this product
@@ -26,10 +27,18 @@ export async function checkAccess(email: string, productId: string): Promise<Acc
       identity: {
         include: {
           entitlements: {
-            where: { productId },
+            where: {
+              productId,
+              revokedAt: null, // Only non-revoked entitlements
+              OR: [
+                { expiresAt: null }, // Never expires
+                { expiresAt: { gt: new Date() } } // Not yet expired
+              ]
+            },
             include: {
               bundle: true
-            }
+            },
+            orderBy: { grantedAt: 'desc' } // Most recent first
           }
         }
       }
@@ -42,8 +51,16 @@ export async function checkAccess(email: string, productId: string): Promise<Acc
       where: { primaryEmail: email.toLowerCase() },
       include: {
         entitlements: {
-          where: { productId },
-          include: { bundle: true }
+          where: {
+            productId,
+            revokedAt: null, // Only non-revoked entitlements
+            OR: [
+              { expiresAt: null }, // Never expires
+              { expiresAt: { gt: new Date() } } // Not yet expired
+            ]
+          },
+          include: { bundle: true },
+          orderBy: { grantedAt: 'desc' } // Most recent first
         }
       }
     })
