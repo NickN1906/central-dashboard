@@ -359,6 +359,79 @@ export async function reportExternalSubscription(params: {
 }
 
 /**
+ * Revoke a specific entitlement by ID
+ * Also syncs to the relevant app
+ */
+export async function revokeEntitlementById(params: {
+  entitlementId: number
+  reason?: string
+  adminEmail?: string
+}) {
+  const { entitlementId, reason, adminEmail } = params
+
+  // Get entitlement with identity info
+  const entitlement = await prisma.entitlement.findUnique({
+    where: { id: entitlementId },
+    include: {
+      identity: true
+    }
+  })
+
+  if (!entitlement) {
+    throw new Error('Entitlement not found')
+  }
+
+  // Revoke in database
+  await prisma.entitlement.update({
+    where: { id: entitlementId },
+    data: {
+      revokedAt: new Date(),
+      revokedReason: reason
+    }
+  })
+
+  await prisma.auditLog.create({
+    data: {
+      action: 'revoke_single',
+      identityId: entitlement.identityId,
+      productIds: [entitlement.productId],
+      adminEmail,
+      details: {
+        reason,
+        source: entitlement.source,
+        sourceApp: entitlement.sourceApp,
+        entitlementId
+      }
+    }
+  })
+
+  // Check if there are other active entitlements for this product
+  const remainingActive = await prisma.entitlement.count({
+    where: {
+      identityId: entitlement.identityId,
+      productId: entitlement.productId,
+      revokedAt: null,
+      OR: [
+        { expiresAt: null },
+        { expiresAt: { gt: new Date() } }
+      ]
+    }
+  })
+
+  // Only sync revocation to app if no other active entitlements remain
+  if (remainingActive === 0 && entitlement.identity.primaryEmail) {
+    const syncResults = await revokeAccessAndSync(
+      entitlement.identity.primaryEmail,
+      [entitlement.productId],
+      reason || `Access revoked via Central Dashboard${adminEmail ? ` by ${adminEmail}` : ''}`
+    )
+    console.log('[Entitlements] App sync results:', syncResults)
+  }
+
+  return { success: true, entitlementId, remainingActive }
+}
+
+/**
  * Revoke access to products for an identity
  * Also syncs to apps to cancel any active Stripe subscriptions
  */
