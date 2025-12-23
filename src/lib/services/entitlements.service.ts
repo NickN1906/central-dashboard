@@ -2,6 +2,7 @@ import prisma from '@/lib/db'
 import { calculateExpiryDate, DurationType } from '@/lib/types'
 import { nanoid } from 'nanoid'
 import { Prisma } from '@prisma/client'
+import { revokeAccessAndSync } from './app-sync.service'
 
 interface AccessResult {
   hasAccess: boolean
@@ -342,6 +343,7 @@ export async function reportExternalSubscription(params: {
 
 /**
  * Revoke access to products for an identity
+ * Also syncs to apps to cancel any active Stripe subscriptions
  */
 export async function revokeAccess(params: {
   identityId: string
@@ -351,6 +353,12 @@ export async function revokeAccess(params: {
 }) {
   const { identityId, productIds, reason, adminEmail } = params
 
+  // Get the identity to get the email for syncing
+  const identity = await prisma.identity.findUnique({
+    where: { id: identityId }
+  })
+
+  // Revoke in database
   await Promise.all(
     productIds.map((productId) =>
       prisma.entitlement.updateMany({
@@ -372,6 +380,36 @@ export async function revokeAccess(params: {
       details: { reason }
     }
   })
+
+  // Sync to apps - this will cancel any active Stripe subscriptions
+  if (identity?.primaryEmail) {
+    const syncResults = await revokeAccessAndSync(
+      identity.primaryEmail,
+      productIds,
+      reason || `Access revoked via Central Dashboard${adminEmail ? ` by ${adminEmail}` : ''}`
+    )
+
+    // Log sync results
+    console.log('[Entitlements] App sync results:', syncResults)
+
+    // Also log sync results to audit log
+    await prisma.auditLog.create({
+      data: {
+        action: 'app_sync_revoke',
+        identityId,
+        productIds,
+        adminEmail,
+        details: {
+          reason,
+          syncResults: syncResults.map(r => ({
+            app: r.app,
+            success: r.success,
+            error: r.error
+          }))
+        }
+      }
+    })
+  }
 }
 
 /**
