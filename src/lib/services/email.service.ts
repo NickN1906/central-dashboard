@@ -39,10 +39,13 @@ export async function sendBundlePurchaseEmail(data: BundlePurchaseEmailData): Pr
     ? `Your access is valid until ${expiresAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.`
     : ''
 
-  // Determine which products are included
-  const hasRezume = productIds.includes('rezume')
-  const hasAICoach = productIds.includes('aicoach')
-  const hasCareerPathways = productIds.includes('careerpathways')
+  // Determine which products are included (check multiple possible IDs)
+  const lowerProductIds = productIds.map(id => id.toLowerCase())
+  const hasRezume = lowerProductIds.some(id => id === 'rezume')
+  const hasAICoach = lowerProductIds.some(id => ['aicoach', 'coach', 'ai-coach'].includes(id))
+  const hasCareerPathways = lowerProductIds.some(id => ['career-pathways', 'careerpathways', 'career'].includes(id))
+
+  console.log(`[Email] Sending bundle email for ${bundleName}. Products: ${productIds.join(', ')}. Rezume: ${hasRezume}, AI Coach: ${hasAICoach}, Career Pathways: ${hasCareerPathways}`)
 
   try {
     const { error } = await resend.emails.send({
