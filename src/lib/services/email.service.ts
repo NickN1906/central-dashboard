@@ -140,13 +140,21 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
       <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
         <h3 style="color: #92400e; margin: 0 0 10px 0;">
           <span style="background: #f59e0b; color: white; padding: 2px 10px; border-radius: 20px; font-size: 14px; margin-right: 10px;">Step ${stepNumber}</span>
-          Career Pathways - Automated Job Applications
+          Career Pathways - Your Canadian Career Guide
         </h3>
-        <p style="color: #333; margin: 10px 0;">Get personalized job matches delivered to your inbox based on your preferences.</p>
-        <ol style="color: #555; margin: 10px 0; padding-left: 20px;">
+        <p style="color: #333; margin: 10px 0;">Get a personalized PDF guide to navigate your career in Canada, tailored to your profession and goals.</p>
+        <p style="color: #555; margin: 10px 0; font-size: 14px;"><strong>Your guide includes:</strong></p>
+        <ul style="color: #555; margin: 10px 0; padding-left: 20px; font-size: 14px;">
+          <li>Self-assessment & 30/60/90 day career plan</li>
+          <li>Provincial regulators & bridging programs for your profession</li>
+          <li>Mentorship opportunities & professional associations</li>
+          <li>Skills match analysis & best cities to work in Canada</li>
+          <li>Alternative career options based on your background</li>
+        </ul>
+        <ol style="color: #555; margin: 15px 0; padding-left: 20px;">
           <li>Click the button below to fill out a quick form</li>
-          <li>Tell us your job preferences and target locations</li>
-          <li>We'll automatically send you matching jobs daily!</li>
+          <li>Tell us about your profession and career goals</li>
+          <li>Receive your personalized Career Pathways PDF guide!</li>
         </ol>
         <div style="background: #fef9c3; padding: 12px; border-radius: 6px; margin: 15px 0;">
           <p style="margin: 0; color: #854d0e; font-size: 14px;">
@@ -154,7 +162,7 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
           </p>
         </div>
         <a href="https://docs.google.com/forms/d/e/1FAIpQLSdHaNH2q6KXcoWUiO3BkSvBUbUG5hCsFkLVz0mx76Pooc6DIg/viewform?usp=header" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">
-          Fill Career Pathways Form &rarr;
+          Get Your Career Guide &rarr;
         </a>
       </div>
     `
