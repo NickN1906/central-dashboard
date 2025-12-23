@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
       const identityEmail = await prisma.identityEmail.findFirst({
         where: {
           email: normalizedEmail,
-          productId: { in: ['career-pathways', 'careerpathways', 'career'] }
+          productId: { in: ['careerpathway', 'career-pathways', 'careerpathways', 'career'] }
         },
         include: { identity: true }
       })
@@ -64,11 +64,11 @@ export async function POST(request: NextRequest) {
       console.log(`[CareerPathways Webhook] Created new identity for: ${normalizedEmail}`)
     }
 
-    // Store the submission
+    // Store the submission (using 'careerpathway' - the actual product ID in the database)
     const submission = await prisma.productSubmission.create({
       data: {
         identityId: identity.id,
-        productId: 'career-pathways',
+        productId: 'careerpathway',
         formData: body,
         zapierTriggered: true
       }
@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
       data: {
         action: 'career_pathways_submission',
         identityId: identity.id,
-        productIds: ['career-pathways'],
+        productIds: ['careerpathway'],
         details: {
           email: normalizedEmail,
           submissionId: submission.id,

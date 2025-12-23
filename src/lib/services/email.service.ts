@@ -43,7 +43,7 @@ export async function sendBundlePurchaseEmail(data: BundlePurchaseEmailData): Pr
   const lowerProductIds = productIds.map(id => id.toLowerCase())
   const hasRezume = lowerProductIds.some(id => id === 'rezume')
   const hasAICoach = lowerProductIds.some(id => ['aicoach', 'coach', 'ai-coach'].includes(id))
-  const hasCareerPathways = lowerProductIds.some(id => ['career-pathways', 'careerpathways', 'career'].includes(id))
+  const hasCareerPathways = lowerProductIds.some(id => ['careerpathway', 'career-pathways', 'careerpathways', 'career'].includes(id))
 
   console.log(`[Email] Sending bundle email for ${bundleName}. Products: ${productIds.join(', ')}. Rezume: ${hasRezume}, AI Coach: ${hasAICoach}, Career Pathways: ${hasCareerPathways}`)
 
