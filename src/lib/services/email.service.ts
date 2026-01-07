@@ -123,11 +123,11 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
         </h3>
         <p style="color: #333; margin: 10px 0;">Practice interviews with AI and get instant feedback to ace your next interview.</p>
         <ol style="color: #555; margin: 10px 0; padding-left: 20px;">
-          <li>Go to <a href="https://your-ai-interview-coach-7f11f441a641.herokuapp.com" style="color: #3b82f6; font-weight: 600;">AI Interview Coach</a></li>
+          <li>Go to <a href="https://aiinterviewcoach.ca/app" style="color: #3b82f6; font-weight: 600;">AI Interview Coach</a></li>
           <li>Sign up or log in with <strong>${customerEmail}</strong></li>
           <li>You'll automatically have full access - start practicing!</li>
         </ol>
-        <a href="https://your-ai-interview-coach-7f11f441a641.herokuapp.com" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">
+        <a href="https://aiinterviewcoach.ca/app" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">
           Open AI Coach &rarr;
         </a>
       </div>
