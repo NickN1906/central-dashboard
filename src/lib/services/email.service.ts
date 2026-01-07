@@ -86,6 +86,18 @@ interface EmailHtmlData {
   customerEmail: string
 }
 
+// Base URL for locally hosted assets
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+
+// Logo URLs for email
+const LOGOS = {
+  immigrantNetworks: 'https://immigrantnetworks.com/wp-content/uploads/2023/11/IMMNet-New-Logo-1-e1715195131262.png',
+  rezume: 'https://rezume.ca/rezume-logo.png',
+  aiInterviewCoach: `${APP_URL}/ai-interview-coach-logo.png`,
+  heartbeat: 'https://dfle76rxbxaz7.cloudfront.net/assets/4e873b7a-033e-46b9-98f4-4a15dbd75957-communitylogo-8053e6c4-a50e-4082-908d-ffa118edaea4.png?Expires=2054192101&Key-Pair-Id=APKAIPAIYEJQ7WRNJNKQ&Signature=R7wcbOzL1m4n9SBPgP3YNQMRnbtyjA1TnB8Chmh5ToOzpPxj~BfiLWc1YXSQLK2pdwyylXlOM179AttWJlwowcgnX7HOWTyAOLPMZrbqyZUtOZ9vSXyR-kX5ZJf0xDAqOVl2mlaPTOgweywfSCczEK1hTErHxbtzTBr3kwto~PchKNQMCXJE0aLVr3I~Z2wFo5bg1Fi0qfvY7IgFeaJeQTqhMzVe7wZqfB6-72U1QLmAGNTb6PrY~15cxId-XP0u-KRR9ZWLrip07bAAc7F5XWL4AGbibF2G9mXDLJyLQwShBL4R8AZAuNUazFXWi8XSL5TSH48~bXtcvXeZ-B8M-A__',
+  careerPathways: 'https://careerpathway.ca/logo.png'
+}
+
 function generateBundleEmailHtml(data: EmailHtmlData): string {
   const { name, bundleName, expiryText, hasRezume, hasAICoach, hasCareerPathways, customerEmail } = data
 
@@ -93,131 +105,243 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
   let productSections = ''
   let stepNumber = 1
 
+  // Step Card Template Function
+  const createStepCard = (
+    step: number,
+    logoUrl: string,
+    logoAlt: string,
+    title: string,
+    description: string,
+    listItems: string[],
+    ctaUrl: string,
+    ctaText: string,
+    extraContent?: string
+  ) => `
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 25px;">
+      <tr>
+        <td style="padding-bottom: 12px;">
+          <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 14px; border-radius: 20px; display: inline-block;">Step ${step}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color: #ffffff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 20px;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom: 1px solid #f0f0f0; padding-bottom: 12px; margin-bottom: 12px;">
+            <tr>
+              <td width="72" valign="middle" style="padding-right: 12px;">
+                <img src="${logoUrl}" alt="${logoAlt}" style="max-width: 60px; height: auto; display: block;">
+              </td>
+              <td valign="middle">
+                <div style="font-size: 18px; font-weight: 700; color: #332D2D;">${title}</div>
+              </td>
+            </tr>
+          </table>
+          <p style="color: #666; margin-bottom: 10px; font-size: 14px; line-height: 1.5;">${description}</p>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 10px 0;">
+            ${listItems.map(item => `
+              <tr>
+                <td style="padding: 5px 0 5px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                  <span style="color: #DB1818; font-weight: 700; font-size: 16px; margin-right: 8px;">✓</span>${item}
+                </td>
+              </tr>
+            `).join('')}
+          </table>
+          ${extraContent || ''}
+          <a href="${ctaUrl}" style="display: inline-block; background-color: #DB1818; color: white; padding: 10px 24px; text-decoration: none; border-radius: 5px; font-weight: 700; font-size: 14px; margin-top: 8px;">${ctaText} →</a>
+        </td>
+      </tr>
+    </table>
+  `
+
   if (hasRezume) {
-    productSections += `
-      <div style="background: #f0fdf4; border-left: 4px solid #22c55e; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-        <h3 style="color: #166534; margin: 0 0 10px 0;">
-          <span style="background: #22c55e; color: white; padding: 2px 10px; border-radius: 20px; font-size: 14px; margin-right: 10px;">Step ${stepNumber}</span>
-          Rezume.ca - AI Resume Builder
-        </h3>
-        <p style="color: #333; margin: 10px 0;">Create stunning, ATS-optimized resumes that get you interviews.</p>
-        <ol style="color: #555; margin: 10px 0; padding-left: 20px;">
-          <li>Go to <a href="https://rezume.ca" style="color: #22c55e; font-weight: 600;">rezume.ca</a></li>
-          <li>Sign up or log in with <strong>${customerEmail}</strong></li>
-          <li>You'll automatically have Pro access - start building!</li>
-        </ol>
-        <a href="https://rezume.ca" style="display: inline-block; background: #22c55e; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">
-          Open Rezume.ca &rarr;
-        </a>
-      </div>
-    `
+    productSections += createStepCard(
+      stepNumber,
+      LOGOS.rezume,
+      'Rezume.ca',
+      'Rezume.ca - AI Resume Builder',
+      'Create stunning, ATS-optimized resumes that get you interviews.',
+      [
+        `Go to <a href="https://rezume.ca" style="color: #DB1818; text-decoration: none; font-weight: 600;">Rezume.ca</a>`,
+        'Click on Get Started',
+        'Sign in with your Gmail or create account (for other emails)',
+        "You'll automatically have Pro access - start building!"
+      ],
+      'https://rezume.ca',
+      'Open Rezume.ca'
+    )
     stepNumber++
   }
 
   if (hasAICoach) {
-    productSections += `
-      <div style="background: #eff6ff; border-left: 4px solid #3b82f6; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-        <h3 style="color: #1e40af; margin: 0 0 10px 0;">
-          <span style="background: #3b82f6; color: white; padding: 2px 10px; border-radius: 20px; font-size: 14px; margin-right: 10px;">Step ${stepNumber}</span>
-          AI Interview Coach
-        </h3>
-        <p style="color: #333; margin: 10px 0;">Practice interviews with AI and get instant feedback to ace your next interview.</p>
-        <ol style="color: #555; margin: 10px 0; padding-left: 20px;">
-          <li>Go to <a href="https://aiinterviewcoach.ca/app" style="color: #3b82f6; font-weight: 600;">AI Interview Coach</a></li>
-          <li>Sign up or log in with <strong>${customerEmail}</strong></li>
-          <li>You'll automatically have full access - start practicing!</li>
-        </ol>
-        <a href="https://aiinterviewcoach.ca/app" style="display: inline-block; background: #3b82f6; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">
-          Open AI Coach &rarr;
-        </a>
-      </div>
-    `
+    productSections += createStepCard(
+      stepNumber,
+      LOGOS.aiInterviewCoach,
+      'AI Interview Coach',
+      'AI Interview Coach',
+      'Practice interviews with AI and get instant feedback to ace your next interview.',
+      [
+        `Go to <a href="https://aiinterviewcoach.ca/" style="color: #DB1818; text-decoration: none; font-weight: 600;">AI Interview Coach</a>`,
+        'Click on Existing User',
+        `Enter <a href="mailto:${customerEmail}" style="color: #DB1818; text-decoration: none; font-weight: 600;">${customerEmail}</a> and access your account`
+      ],
+      'https://aiinterviewcoach.ca/',
+      'Open AI Coach'
+    )
     stepNumber++
   }
 
+  // Always include Heartbeat Community as a step
+  productSections += `
+    <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 25px;">
+      <tr>
+        <td style="padding-bottom: 12px;">
+          <span style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: #ffffff; font-weight: 700; font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; padding: 8px 14px; border-radius: 20px; display: inline-block;">Step ${stepNumber}</span>
+        </td>
+      </tr>
+      <tr>
+        <td style="background-color: #ffffff; border: 1px solid #e8e8e8; border-radius: 8px; padding: 20px;">
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="border-bottom: 1px solid #f0f0f0; padding-bottom: 12px; margin-bottom: 12px;">
+            <tr>
+              <td width="62" valign="middle" style="padding-right: 12px;">
+                <img src="${LOGOS.heartbeat}" alt="Heartbeat Community" style="max-width: 50px; height: auto; display: block;">
+              </td>
+              <td valign="middle">
+                <div style="font-size: 18px; font-weight: 700; color: #332D2D;">Join Our Heartbeat Community</div>
+              </td>
+            </tr>
+          </table>
+          <p style="color: #666; margin-bottom: 10px; font-size: 14px; line-height: 1.5;">Connect with fellow members and join our live workshops on Heartbeat, our exclusive community platform.</p>
+          <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin: 10px 0;">
+            <tr>
+              <td style="padding: 5px 0 5px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                <span style="color: #DB1818; font-weight: 700; font-size: 16px; margin-right: 8px;">✓</span>Check your inbox <strong style="color: #DB1818;">(and spam folder!)</strong> for an invite to join Heartbeat platform
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0 5px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                <span style="color: #DB1818; font-weight: 700; font-size: 16px; margin-right: 8px;">✓</span>Fill out a small questionnaire about yourself
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0 5px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                <span style="color: #DB1818; font-weight: 700; font-size: 16px; margin-right: 8px;">✓</span>Let our community get to know you better
+              </td>
+            </tr>
+            <tr>
+              <td style="padding: 5px 0 5px 0; color: #666; font-size: 14px; line-height: 1.5;">
+                <span style="color: #DB1818; font-weight: 700; font-size: 16px; margin-right: 8px;">✓</span>Boom! You're part of the Immigrant Networks community
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  `
+  stepNumber++
+
   if (hasCareerPathways) {
-    productSections += `
-      <div style="background: #fef3c7; border-left: 4px solid #f59e0b; padding: 20px; margin: 20px 0; border-radius: 0 8px 8px 0;">
-        <h3 style="color: #92400e; margin: 0 0 10px 0;">
-          <span style="background: #f59e0b; color: white; padding: 2px 10px; border-radius: 20px; font-size: 14px; margin-right: 10px;">Step ${stepNumber}</span>
-          Career Pathways - Your Canadian Career Guide
-        </h3>
-        <p style="color: #333; margin: 10px 0;">Get a personalized PDF guide to navigate your career in Canada, tailored to your profession and goals.</p>
-        <p style="color: #555; margin: 10px 0; font-size: 14px;"><strong>Your guide includes:</strong></p>
-        <ul style="color: #555; margin: 10px 0; padding-left: 20px; font-size: 14px;">
-          <li>Self-assessment & 30/60/90 day career plan</li>
-          <li>Provincial regulators & bridging programs for your profession</li>
-          <li>Mentorship opportunities & professional associations</li>
-          <li>Skills match analysis & best cities to work in Canada</li>
-          <li>Alternative career options based on your background</li>
-        </ul>
-        <ol style="color: #555; margin: 15px 0; padding-left: 20px;">
-          <li>Click the button below to fill out a quick form</li>
-          <li>Tell us about your profession and career goals</li>
-          <li>Receive your personalized Career Pathways PDF guide!</li>
-        </ol>
-        <div style="background: #fef9c3; padding: 12px; border-radius: 6px; margin: 15px 0;">
-          <p style="margin: 0; color: #854d0e; font-size: 14px;">
-            <strong>Important:</strong> Use the same email (<strong>${customerEmail}</strong>) when filling the form to link your access.
-          </p>
-        </div>
-        <a href="https://docs.google.com/forms/d/e/1FAIpQLSdHaNH2q6KXcoWUiO3BkSvBUbUG5hCsFkLVz0mx76Pooc6DIg/viewform?usp=header" style="display: inline-block; background: #f59e0b; color: white; padding: 10px 20px; text-decoration: none; border-radius: 6px; font-weight: 600; margin-top: 10px;">
-          Get Your Career Guide &rarr;
-        </a>
+    const guideFeatures = `
+      <div style="background-color: #FFF9F5; padding: 12px 15px; border-radius: 6px; margin: 10px 0;">
+        <div style="color: #332D2D; margin-bottom: 8px; font-size: 14px; font-weight: 700;">Your guide includes:</div>
+        <table cellpadding="0" cellspacing="0" border="0" width="100%">
+          <tr><td style="padding: 3px 0 3px 0; font-size: 13px; color: #666; line-height: 1.4;"><span style="color: #DB1818; font-size: 18px; margin-right: 6px;">•</span>Self-assessment & 30/60/90 day career plan</td></tr>
+          <tr><td style="padding: 3px 0 3px 0; font-size: 13px; color: #666; line-height: 1.4;"><span style="color: #DB1818; font-size: 18px; margin-right: 6px;">•</span>Provincial regulators & bridging programs for your profession</td></tr>
+          <tr><td style="padding: 3px 0 3px 0; font-size: 13px; color: #666; line-height: 1.4;"><span style="color: #DB1818; font-size: 18px; margin-right: 6px;">•</span>Mentorship opportunities & professional associations</td></tr>
+          <tr><td style="padding: 3px 0 3px 0; font-size: 13px; color: #666; line-height: 1.4;"><span style="color: #DB1818; font-size: 18px; margin-right: 6px;">•</span>Skills match analysis & best cities to work in Canada</td></tr>
+          <tr><td style="padding: 3px 0 3px 0; font-size: 13px; color: #666; line-height: 1.4;"><span style="color: #DB1818; font-size: 18px; margin-right: 6px;">•</span>Alternative career options based on your background</td></tr>
+        </table>
+      </div>
+      <div style="background-color: #FFF9F5; padding: 10px 15px; margin: 12px 0; border-radius: 6px; border-left: 4px solid #DB1818; font-size: 14px; line-height: 1.5;">
+        <strong style="color: #332D2D;">⚠️ Important:</strong> Use the same email (<a href="mailto:${customerEmail}" style="color: #DB1818; text-decoration: none; font-weight: 600;">${customerEmail}</a>) when filling the form to link your access.
       </div>
     `
+
+    productSections += createStepCard(
+      stepNumber,
+      LOGOS.careerPathways,
+      'Career Pathways',
+      'Career Pathways - Your Canadian Career Guide',
+      'Get a personalized PDF guide to navigate your career in Canada, tailored to your profession and goals.',
+      [
+        'Click the button below to fill out a quick form',
+        'Tell us about your profession and career goals',
+        'Receive your personalized Career Pathways PDF guide!'
+      ],
+      'https://careerpathway.ca',
+      'Get Your Career Guide',
+      guideFeatures
+    )
     stepNumber++
   }
+
+  const totalSteps = stepNumber - 1
 
   return `
     <!DOCTYPE html>
-    <html>
+    <html lang="en">
     <head>
-      <meta charset="utf-8">
+      <meta charset="UTF-8">
       <meta name="viewport" content="width=device-width, initial-scale=1.0">
       <title>Welcome to ${bundleName}</title>
     </head>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
-      <div style="background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 50%, #3b82f6 100%); padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-        <h1 style="color: white; margin: 0; font-size: 28px;">Welcome to ${bundleName}!</h1>
-        <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your career transformation starts now</p>
-      </div>
+    <body style="font-family: 'Lato', Arial, sans-serif; line-height: 1.5; color: #332D2D; background-color: #FFF9F5; margin: 0; padding: 0;">
+      <table cellpadding="0" cellspacing="0" border="0" width="100%" style="max-width: 600px; margin: 0 auto; background-color: #ffffff;">
+        <!-- Header -->
+        <tr>
+          <td style="background-color: #DB1818; padding: 25px 30px 20px; text-align: center;">
+            <div style="background-color: #ffffff; padding: 12px 18px; border-radius: 8px; display: inline-block; margin-bottom: 15px;">
+              <img src="${LOGOS.immigrantNetworks}" alt="Immigrant Networks" style="max-width: 150px; height: auto; display: block;">
+            </div>
+            <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 6px 0;">Welcome to The A-Game!</h1>
+            <p style="color: rgba(255, 255, 255, 0.9); font-size: 15px; font-weight: 300; margin: 0;">Your career transformation starts now</p>
+          </td>
+        </tr>
 
-      <div style="background: #ffffff; padding: 30px; border: 1px solid #e0e0e0; border-top: none; border-radius: 0 0 12px 12px;">
-        <h2 style="color: #333; margin-top: 0;">Hi ${name}!</h2>
+        <!-- Main Content -->
+        <tr>
+          <td style="padding: 25px 30px;">
+            <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 12px 0; color: #332D2D;">Hi ${name}!</h2>
 
-        <p>Thank you for your purchase! Your access to all products in the <strong>${bundleName}</strong> is now active.</p>
+            <p style="font-size: 15px; color: #332D2D; margin: 0 0 10px 0; line-height: 1.5;">
+              Thank you for your purchase! Your access to all products in the
+              <span style="color: #DB1818; font-weight: 700;">${bundleName}</span> is now active.
+            </p>
 
-        ${expiryText ? `<p style="color: #666;">${expiryText}</p>` : ''}
+            ${expiryText ? `
+            <div style="background-color: #FFF9F5; padding: 10px 15px; margin: 12px 0; border-radius: 6px; border-left: 4px solid #DB1818; font-size: 14px; line-height: 1.5;">
+              <strong style="color: #332D2D;">📅 ${expiryText}</strong>
+            </div>
+            ` : ''}
 
-        <div style="background: #f8fafc; padding: 15px; border-radius: 8px; margin: 20px 0;">
-          <p style="margin: 0; color: #475569; font-size: 15px;">
-            <strong>Quick Tip:</strong> Use the same email (<strong>${customerEmail}</strong>) when signing up for each product to automatically unlock your Pro access.
-          </p>
-        </div>
+            <div style="background-color: #FFF9F5; padding: 10px 15px; margin: 12px 0; border-radius: 6px; border-left: 4px solid #DB1818; font-size: 14px; line-height: 1.5;">
+              <strong style="color: #332D2D;">💡 Quick Tip:</strong> Use the same email
+              (<a href="mailto:${customerEmail}" style="color: #DB1818; text-decoration: none; font-weight: 600;">${customerEmail}</a>)
+              when signing up for each product to automatically unlock your Pro access.
+            </div>
 
-        <h2 style="color: #333; border-bottom: 2px solid #e5e7eb; padding-bottom: 10px; margin-top: 30px;">
-          Getting Started (${stepNumber - 1} Easy Steps)
-        </h2>
+            <!-- Getting Started -->
+            <h2 style="font-size: 20px; font-weight: 700; margin: 25px 0 15px 0; color: #332D2D;">Getting Started (${totalSteps} Easy Steps)</h2>
 
-        ${productSections}
+            ${productSections}
 
-        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
+            <!-- Support -->
+            <div style="text-align: center; padding: 20px; background-color: #FFF9F5; margin-top: 20px; border-radius: 8px;">
+              <h3 style="color: #332D2D; margin: 0 0 8px 0; font-weight: 700; font-size: 17px;">Need help? We're here for you!</h3>
+              <p style="color: #666; font-size: 14px; margin: 0;">
+                Reply to this email or contact us at
+                <a href="mailto:support@immnet.ca" style="color: #DB1818; text-decoration: none; font-weight: 600;">support@immnet.ca</a>
+              </p>
+            </div>
+          </td>
+        </tr>
 
-        <div style="text-align: center;">
-          <p style="color: #666; margin-bottom: 5px;">Need help? We're here for you!</p>
-          <p style="color: #999; font-size: 14px; margin: 0;">
-            Reply to this email or contact us at <a href="mailto:support@immigrantnetworks.ca" style="color: #6366f1;">support@immigrantnetworks.ca</a>
-          </p>
-        </div>
-
-        <hr style="border: none; border-top: 1px solid #e0e0e0; margin: 30px 0;">
-
-        <p style="color: #999; font-size: 12px; margin: 0; text-align: center;">
-          You're receiving this email because you purchased the ${bundleName}.<br>
-          &copy; ${new Date().getFullYear()} Immigrant Networks - All rights reserved.
-        </p>
-      </div>
+        <!-- Footer -->
+        <tr>
+          <td style="background-color: #f5f5f5; color: #666; padding: 20px 30px; text-align: center; font-size: 12px;">
+            <p style="margin: 5px 0; line-height: 1.5;">You're receiving this email because you purchased the ${bundleName}.</p>
+            <p style="margin: 5px 0; line-height: 1.5;">© ${new Date().getFullYear()} Immigrant Networks - All rights reserved.</p>
+          </td>
+        </tr>
+      </table>
     </body>
     </html>
   `
