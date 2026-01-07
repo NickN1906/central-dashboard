@@ -161,7 +161,6 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
       'Create stunning, ATS-optimized resumes that get you interviews.',
       [
         `Go to <a href="https://rezume.ca/signup" style="color: #DB1818; text-decoration: none; font-weight: 600;">Rezume.ca</a>`,
-        'Click on Get Started',
         'Sign in with your Gmail or create account (for other emails)',
         "You'll automatically have Pro access - start building!"
       ],
