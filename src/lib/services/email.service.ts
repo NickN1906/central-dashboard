@@ -160,12 +160,12 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
       'Rezume.ca - AI Resume Builder',
       'Create stunning, ATS-optimized resumes that get you interviews.',
       [
-        `Go to <a href="https://rezume.ca" style="color: #DB1818; text-decoration: none; font-weight: 600;">Rezume.ca</a>`,
+        `Go to <a href="https://rezume.ca/signup" style="color: #DB1818; text-decoration: none; font-weight: 600;">Rezume.ca</a>`,
         'Click on Get Started',
         'Sign in with your Gmail or create account (for other emails)',
         "You'll automatically have Pro access - start building!"
       ],
-      'https://rezume.ca',
+      'https://rezume.ca/signup',
       'Open Rezume.ca'
     )
     stepNumber++
@@ -179,11 +179,11 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
       'AI Interview Coach',
       'Practice interviews with AI and get instant feedback to ace your next interview.',
       [
-        `Go to <a href="https://aiinterviewcoach.ca/" style="color: #DB1818; text-decoration: none; font-weight: 600;">AI Interview Coach</a>`,
+        `Go to <a href="https://aiinterviewcoach.ca/app" style="color: #DB1818; text-decoration: none; font-weight: 600;">AI Interview Coach</a>`,
         'Click on Existing User',
         `Enter <a href="mailto:${customerEmail}" style="color: #DB1818; text-decoration: none; font-weight: 600;">${customerEmail}</a> and access your account`
       ],
-      'https://aiinterviewcoach.ca/',
+      'https://aiinterviewcoach.ca/app',
       'Open AI Coach'
     )
     stepNumber++
@@ -266,7 +266,7 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
         'Tell us about your profession and career goals',
         'Receive your personalized Career Pathways PDF guide!'
       ],
-      'https://careerpathway.ca',
+      'https://docs.google.com/forms/d/e/1FAIpQLSdHaNH2q6KXcoWUiO3BkSvBUbUG5hCsFkLVz0mx76Pooc6DIg/viewform?usp=header',
       'Get Your Career Guide',
       guideFeatures
     )
