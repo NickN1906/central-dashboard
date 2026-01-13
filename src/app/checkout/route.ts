@@ -51,6 +51,9 @@ export async function GET(request: NextRequest) {
       apiVersion: '2025-12-15.clover'
     })
 
+    // Determine checkout mode based on bundle duration type
+    const isSubscription = bundle.durationType !== 'lifetime'
+
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -60,7 +63,7 @@ export async function GET(request: NextRequest) {
           quantity: 1,
         },
       ],
-      mode: bundle.durationType === 'lifetime' ? 'payment' : 'subscription',
+      mode: isSubscription ? 'subscription' : 'payment',
       success_url: successUrl,
       cancel_url: cancelUrl,
       metadata: {
@@ -68,9 +71,9 @@ export async function GET(request: NextRequest) {
         bundle_name: bundle.name,
         product_ids: bundle.productIds.join(','),
       },
-      // Allow customer to enter their email
-      customer_creation: 'always',
       billing_address_collection: 'required',
+      // customer_creation only works in payment mode, not subscription mode
+      ...(isSubscription ? {} : { customer_creation: 'always' }),
     })
 
     if (!session.url) {
