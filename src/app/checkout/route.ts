@@ -51,8 +51,11 @@ export async function GET(request: NextRequest) {
       apiVersion: '2025-12-15.clover'
     })
 
-    // Determine checkout mode based on bundle duration type
-    const isSubscription = bundle.durationType !== 'lifetime'
+    // Check the Stripe price to determine if it's recurring (subscription) or one-time (payment)
+    const price = await stripe.prices.retrieve(priceId)
+    const isSubscription = price.type === 'recurring'
+
+    console.log(`[Checkout] Price ${priceId} type: ${price.type} (${isSubscription ? 'subscription' : 'payment'} mode)`)
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
