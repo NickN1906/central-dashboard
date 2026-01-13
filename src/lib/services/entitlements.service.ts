@@ -146,7 +146,7 @@ export async function grantAccess(params: {
   identityId: string
   productIds: string[]
   source: 'bundle' | 'direct' | 'promo' | 'manual'
-  sourceApp?: 'central' | 'rezume' | 'aicoach'
+  sourceApp?: 'central' | 'rezume' | 'aicoach' | '123jobs-resume' | '123jobs-interview'
   bundleId?: number
   durationType?: DurationType
   durationValue?: number | null
@@ -231,14 +231,14 @@ export async function grantAccess(params: {
 }
 
 /**
- * Report a subscription from an external app (Rezume, AI Coach)
+ * Report a subscription from an external app (Rezume, AI Coach, 123jobs apps)
  * This is called when apps grant their own subscriptions
  */
 export async function reportExternalSubscription(params: {
   email: string
   productId: string
   action: 'grant' | 'revoke'
-  sourceApp: 'rezume' | 'aicoach'
+  sourceApp: 'rezume' | 'aicoach' | '123jobs-resume' | '123jobs-interview'
   stripeSubscriptionId?: string
   stripePriceId?: string
   amountPaid?: number

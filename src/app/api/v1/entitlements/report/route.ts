@@ -3,10 +3,13 @@ import { reportExternalSubscription } from '@/lib/services/entitlements.service'
 
 const ADMIN_API_KEY = process.env.CENTRAL_DASHBOARD_API_KEY
 
+// Valid source apps that can report subscriptions
+const VALID_SOURCE_APPS = ['rezume', 'aicoach', '123jobs-resume', '123jobs-interview']
+
 /**
  * POST /api/v1/entitlements/report
  *
- * Called by external apps (Rezume, AI Coach) to report subscription changes.
+ * Called by external apps (Rezume, AI Coach, 123jobs apps) to report subscription changes.
  * This allows Central Dashboard to maintain visibility of ALL subscriptions
  * across the platform, not just bundles.
  *
@@ -15,9 +18,9 @@ const ADMIN_API_KEY = process.env.CENTRAL_DASHBOARD_API_KEY
  * Body:
  * {
  *   email: string (required)
- *   productId: string (required) - 'rezume' or 'aicoach'
+ *   productId: string (required) - 'rezume', 'aicoach', '123jobs-resume', '123jobs-interview'
  *   action: 'grant' | 'revoke' (required)
- *   sourceApp: 'rezume' | 'aicoach' (required) - which app is reporting
+ *   sourceApp: 'rezume' | 'aicoach' | '123jobs-resume' | '123jobs-interview' (required)
  *   stripeSubscriptionId?: string
  *   stripePriceId?: string
  *   amountPaid?: number (in cents)
@@ -84,9 +87,9 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    if (!sourceApp || !['rezume', 'aicoach'].includes(sourceApp)) {
+    if (!sourceApp || !VALID_SOURCE_APPS.includes(sourceApp)) {
       return NextResponse.json(
-        { error: 'Missing or invalid field: sourceApp (must be "rezume" or "aicoach")' },
+        { error: `Missing or invalid field: sourceApp (must be one of: ${VALID_SOURCE_APPS.join(', ')})` },
         { status: 400 }
       )
     }
@@ -132,13 +135,14 @@ export async function GET() {
   return NextResponse.json({
     endpoint: '/api/v1/entitlements/report',
     method: 'POST',
-    description: 'Report subscription changes from external apps (Rezume, AI Coach)',
+    description: 'Report subscription changes from external apps (Rezume, AI Coach, 123jobs apps)',
     authentication: 'X-Admin-Api-Key header required',
+    validSourceApps: VALID_SOURCE_APPS,
     body: {
       email: 'string (required)',
-      productId: 'string (required) - "rezume" or "aicoach"',
+      productId: `string (required) - one of: ${VALID_SOURCE_APPS.join(', ')}`,
       action: '"grant" | "revoke" (required)',
-      sourceApp: '"rezume" | "aicoach" (required)',
+      sourceApp: `one of: ${VALID_SOURCE_APPS.join(', ')} (required)`,
       stripeSubscriptionId: 'string (optional)',
       stripePriceId: 'string (optional)',
       amountPaid: 'number in cents (optional)',
@@ -147,21 +151,21 @@ export async function GET() {
       reason: 'string for revocations (optional)'
     },
     examples: {
-      grant: {
+      grant_123jobs: {
         email: 'user@example.com',
-        productId: 'rezume',
+        productId: '123jobs-resume',
         action: 'grant',
-        sourceApp: 'rezume',
+        sourceApp: '123jobs-resume',
         stripeSubscriptionId: 'sub_xxx',
         stripePriceId: 'price_xxx',
         amountPaid: 1999,
         currency: 'cad'
       },
-      revoke: {
+      revoke_123jobs: {
         email: 'user@example.com',
-        productId: 'rezume',
+        productId: '123jobs-interview',
         action: 'revoke',
-        sourceApp: 'rezume',
+        sourceApp: '123jobs-interview',
         stripeSubscriptionId: 'sub_xxx',
         reason: 'Subscription canceled'
       }

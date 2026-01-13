@@ -27,6 +27,21 @@ const APP_CONFIG: Record<
       'https://your-ai-interview-coach-7f11f441a641.herokuapp.com',
     productId: 'aicoach',
   },
+  // 123jobs.ca Products (separate from rezume/aicoach)
+  '123jobs-resume': {
+    name: '123 Jobs AI Resume',
+    baseUrl:
+      process.env.JOBS123_RESUME_API_URL ||
+      'https://ai-resume-123jobs-413c2de82766.herokuapp.com',
+    productId: '123jobs-resume',
+  },
+  '123jobs-interview': {
+    name: '123 Jobs Interview Coach',
+    baseUrl:
+      process.env.JOBS123_INTERVIEW_API_URL ||
+      'https://interview-123jobs-api-83a5741b270e.herokuapp.com',
+    productId: '123jobs-interview',
+  },
 }
 
 const ADMIN_API_KEY = process.env.CENTRAL_DASHBOARD_API_KEY
