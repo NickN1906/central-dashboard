@@ -12,6 +12,7 @@ import prisma from '@/lib/db'
  * - price_id: Stripe price ID (required)
  * - success_url: URL to redirect to after successful payment (optional)
  * - cancel_url: URL to redirect to if payment is cancelled (optional)
+ * - allow_promotion_codes: Enable coupon/promo codes at checkout (optional, defaults to true)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -19,6 +20,8 @@ export async function GET(request: NextRequest) {
     const priceId = searchParams.get('price_id')
     const successUrl = searchParams.get('success_url') || `${process.env.NEXT_PUBLIC_APP_URL || 'https://central-dashboard-bbbb57a5985e.herokuapp.com'}/checkout/success`
     const cancelUrl = searchParams.get('cancel_url') || `${process.env.NEXT_PUBLIC_APP_URL || 'https://central-dashboard-bbbb57a5985e.herokuapp.com'}/checkout/cancelled`
+    // Enable promotion codes by default - can be disabled by passing allow_promotion_codes=false
+    const allowPromotionCodes = searchParams.get('allow_promotion_codes') !== 'false'
 
     if (!priceId) {
       return NextResponse.json(
@@ -75,6 +78,8 @@ export async function GET(request: NextRequest) {
         product_ids: bundle.productIds.join(','),
       },
       billing_address_collection: 'required',
+      // Enable coupon/promo codes at checkout
+      allow_promotion_codes: allowPromotionCodes,
       // customer_creation only works in payment mode, not subscription mode
       ...(isSubscription ? {} : { customer_creation: 'always' }),
     })
