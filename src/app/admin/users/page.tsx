@@ -31,6 +31,20 @@ interface Product {
   isActive: boolean
 }
 
+interface Bundle {
+  id: number
+  name: string
+  slug: string
+  description: string | null
+  stripePriceId: string
+  productIds: string[]
+  productNames: string[]
+  durationType: string
+  durationValue: number | null
+  isActive: boolean
+  _count: { entitlements: number; claimTokens: number }
+}
+
 interface User {
   id: string
   primaryEmail: string
@@ -42,6 +56,7 @@ interface User {
 export default function UsersPage() {
   const [users, setUsers] = useState<User[]>([])
   const [products, setProducts] = useState<Product[]>([])
+  const [bundles, setBundles] = useState<Bundle[]>([])
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -53,6 +68,15 @@ export default function UsersPage() {
   const [grantForm, setGrantForm] = useState({
     productIds: [] as string[],
     durationType: 'lifetime',
+    durationValue: ''
+  })
+
+  // Grant Bundle Dialog
+  const [grantBundleDialogOpen, setGrantBundleDialogOpen] = useState(false)
+  const [grantingBundleUser, setGrantingBundleUser] = useState<User | null>(null)
+  const [grantBundleForm, setGrantBundleForm] = useState({
+    bundleId: null as number | null,
+    durationType: 'bundle',
     durationValue: ''
   })
 
@@ -69,17 +93,20 @@ export default function UsersPage() {
     setLoading(true)
     try {
       const token = localStorage.getItem('admin_token')
-      const [usersRes, productsRes] = await Promise.all([
+      const [usersRes, productsRes, bundlesRes] = await Promise.all([
         fetch('/api/v1/admin/users', { headers: { Authorization: `Bearer ${token}` } }),
-        fetch('/api/v1/admin/products', { headers: { Authorization: `Bearer ${token}` } })
+        fetch('/api/v1/admin/products', { headers: { Authorization: `Bearer ${token}` } }),
+        fetch('/api/v1/admin/bundles', { headers: { Authorization: `Bearer ${token}` } })
       ])
 
       const usersData = await usersRes.json()
       const productsData = await productsRes.json()
+      const bundlesData = await bundlesRes.json()
 
       setUsers(usersData.users || [])
       setTotal(usersData.total || 0)
       setProducts(productsData.products || [])
+      setBundles(bundlesData.bundles || [])
     } catch (error) {
       console.error('Error fetching data:', error)
     } finally {
@@ -121,6 +148,16 @@ export default function UsersPage() {
       durationValue: ''
     })
     setGrantDialogOpen(true)
+  }
+
+  function openGrantBundleDialog(user: User) {
+    setGrantingBundleUser(user)
+    setGrantBundleForm({
+      bundleId: null,
+      durationType: 'bundle',
+      durationValue: ''
+    })
+    setGrantBundleDialogOpen(true)
   }
 
   function toggleGrantProduct(productId: string) {
@@ -170,6 +207,53 @@ export default function UsersPage() {
     } catch (error) {
       console.error('Error granting access:', error)
       toast.error('Failed to grant access')
+    } finally {
+      setSaving(null)
+    }
+  }
+
+  async function handleGrantBundle(e: React.FormEvent) {
+    e.preventDefault()
+
+    if (!grantingBundleUser || !grantBundleForm.bundleId) {
+      toast.error('Please select a bundle')
+      return
+    }
+
+    const bundle = bundles.find(b => b.id === grantBundleForm.bundleId)
+    if (!bundle) {
+      toast.error('Bundle not found')
+      return
+    }
+
+    setSaving(grantingBundleUser.id)
+    try {
+      const token = localStorage.getItem('admin_token')
+      const res = await fetch(`/api/v1/admin/users/${grantingBundleUser.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          bundleId: grantBundleForm.bundleId,
+          source: 'bundle'
+        })
+      })
+
+      const data = await res.json()
+
+      if (data.success) {
+        toast.success('Bundle granted! Changes may take up to 2 minutes to reflect across all apps.')
+        setGrantBundleDialogOpen(false)
+        setGrantingBundleUser(null)
+        fetchUsers(search)
+      } else {
+        toast.error(data.error || 'Failed to grant bundle')
+      }
+    } catch (error) {
+      console.error('Error granting bundle:', error)
+      toast.error('Failed to grant bundle')
     } finally {
       setSaving(null)
     }
@@ -310,6 +394,15 @@ export default function UsersPage() {
                       </Badge>
                       <Button
                         size="sm"
+                        onClick={() => openGrantBundleDialog(user)}
+                        disabled={bundles.length === 0}
+                      >
+                        <Plus className="h-4 w-4 mr-1" />
+                        Grant Bundle
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
                         onClick={() => openGrantDialog(user)}
                         disabled={getAvailableProducts(user).length === 0}
                       >
@@ -533,6 +626,72 @@ export default function UsersPage() {
               <Button type="submit" disabled={saving !== null}>
                 {saving !== null && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Grant Bundle Dialog */}
+      <Dialog open={grantBundleDialogOpen} onOpenChange={setGrantBundleDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Grant Bundle Access</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleGrantBundle} className="space-y-4">
+            <div>
+              <p className="text-sm text-gray-600 mb-2">
+                Granting to: <span className="font-medium">{grantingBundleUser?.primaryEmail}</span>
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="bundleSelect">Select Bundle</Label>
+              <Select
+                value={grantBundleForm.bundleId?.toString() || ''}
+                onValueChange={(value) => setGrantBundleForm({ ...grantBundleForm, bundleId: parseInt(value) })}
+              >
+                <SelectTrigger id="bundleSelect">
+                  <SelectValue placeholder="Choose a bundle..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {bundles.map((bundle) => (
+                    <SelectItem key={bundle.id} value={bundle.id.toString()}>
+                      {bundle.name}
+                      <span className="text-xs text-gray-500 ml-2">
+                        ({bundle.productNames.join(', ')})
+                      </span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {grantBundleForm.bundleId && (
+              <div className="bg-blue-50 border border-blue-200 rounded-md p-3 text-sm text-blue-800">
+                <p className="font-medium mb-1">Bundle Details:</p>
+                <p>
+                  {bundles.find(b => b.id === grantBundleForm.bundleId)?.productNames.join(', ')}
+                </p>
+                <p className="text-xs mt-2">
+                  Duration: {bundles.find(b => b.id === grantBundleForm.bundleId)?.durationType === 'lifetime'
+                    ? 'Lifetime'
+                    : `${bundles.find(b => b.id === grantBundleForm.bundleId)?.durationValue} ${bundles.find(b => b.id === grantBundleForm.bundleId)?.durationType}`}
+                </p>
+              </div>
+            )}
+
+            <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-800">
+              Note: Changes may take up to 2 minutes to reflect across all connected apps.
+            </div>
+
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setGrantBundleDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" disabled={saving !== null || !grantBundleForm.bundleId}>
+                {saving !== null && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Grant Bundle
               </Button>
             </DialogFooter>
           </form>

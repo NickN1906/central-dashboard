@@ -181,9 +181,29 @@ export async function PATCH(
 
   try {
     const body = await request.json()
-    const { productIds, durationType, durationValue, source } = body
+    const { productIds, bundleId, durationType, durationValue, source } = body
 
-    if (!productIds || productIds.length === 0) {
+    // Determine which products to grant - either directly or via bundle
+    let targetProductIds = productIds
+    let targetBundleId = bundleId
+
+    if (bundleId) {
+      // Fetch bundle and use its products
+      const bundle = await prisma.bundle.findUnique({
+        where: { id: bundleId }
+      })
+
+      if (!bundle) {
+        return NextResponse.json(
+          { error: 'Bundle not found' },
+          { status: 404 }
+        )
+      }
+
+      targetProductIds = bundle.productIds
+    }
+
+    if (!targetProductIds || targetProductIds.length === 0) {
       return NextResponse.json(
         { error: 'At least one product is required' },
         { status: 400 }
@@ -201,8 +221,9 @@ export async function PATCH(
 
     await grantAccess({
       identityId: id,
-      productIds,
-      source: source || 'manual',
+      productIds: targetProductIds,
+      bundleId: targetBundleId,
+      source: source || (bundleId ? 'bundle' : 'manual'),
       durationType: durationType || 'lifetime',
       durationValue: durationValue || null
     })
@@ -211,9 +232,9 @@ export async function PATCH(
       data: {
         action: 'admin_grant',
         identityId: id,
-        productIds,
+        productIds: targetProductIds,
         adminEmail: authResult.admin.email,
-        details: { durationType, durationValue, source }
+        details: { bundleId, durationType, durationValue, source }
       }
     })
 
