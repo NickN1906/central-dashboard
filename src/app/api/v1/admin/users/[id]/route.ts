@@ -186,9 +186,11 @@ export async function PATCH(
     // Determine which products to grant - either directly or via bundle
     let targetProductIds = productIds
     let targetBundleId = bundleId
+    let targetDurationType = durationType
+    let targetDurationValue = durationValue
 
     if (bundleId) {
-      // Fetch bundle and use its products
+      // Fetch bundle and use its products and duration settings
       const bundle = await prisma.bundle.findUnique({
         where: { id: bundleId }
       })
@@ -201,6 +203,8 @@ export async function PATCH(
       }
 
       targetProductIds = bundle.productIds
+      targetDurationType = bundle.durationType
+      targetDurationValue = bundle.durationValue
     }
 
     if (!targetProductIds || targetProductIds.length === 0) {
@@ -224,8 +228,8 @@ export async function PATCH(
       productIds: targetProductIds,
       bundleId: targetBundleId,
       source: source || (bundleId ? 'bundle' : 'manual'),
-      durationType: durationType || 'lifetime',
-      durationValue: durationValue || null
+      durationType: targetDurationType,
+      durationValue: targetDurationValue
     })
 
     await prisma.auditLog.create({
@@ -234,7 +238,7 @@ export async function PATCH(
         identityId: id,
         productIds: targetProductIds,
         adminEmail: authResult.admin.email,
-        details: { bundleId, durationType, durationValue, source }
+        details: { bundleId, durationType: targetDurationType, durationValue: targetDurationValue, source }
       }
     })
 
