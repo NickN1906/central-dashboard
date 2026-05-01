@@ -290,7 +290,7 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
             <div style="background-color: #ffffff; padding: 12px 18px; border-radius: 8px; display: inline-block; margin-bottom: 15px;">
               <img src="${LOGOS.immigrantNetworks}" alt="Immigrant Networks" style="max-width: 150px; height: auto; display: block;">
             </div>
-            <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 6px 0;">Welcome to The A-Game!</h1>
+            <h1 style="color: #ffffff; font-size: 26px; font-weight: 700; margin: 0 0 6px 0;">Welcome to ${bundleName}!</h1>
             <p style="color: rgba(255, 255, 255, 0.9); font-size: 15px; font-weight: 300; margin: 0;">Your career transformation starts now</p>
           </td>
         </tr>
