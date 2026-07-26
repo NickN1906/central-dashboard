@@ -72,35 +72,47 @@ interface ClassifiedSource {
   aiProducts: string
 }
 
+interface EntitlementLite {
+  source: string
+  sourceApp: string | null
+  productId: string
+  revokedAt: Date | null
+  expiresAt: Date | null
+}
+
 function classify(
   signupSource: string | null,
   emailProductIds: string[],
-  activeEntitlements: { source: string; sourceApp: string | null; productId: string }[]
+  entitlements: EntitlementLite[]
 ): ClassifiedSource {
+  const now = new Date()
+  const nonRevoked = entitlements.filter((e) => !e.revokedAt)
+  const active = nonRevoked.filter((e) => !e.expiresAt || e.expiresAt > now)
+
+  // AI_Products: everything they've been linked to or (ever) entitled to.
   const products = new Set<string>()
   emailProductIds.forEach((p) => PRODUCT_NAMES[p] && products.add(PRODUCT_NAMES[p]))
-  activeEntitlements.forEach((e) => PRODUCT_NAMES[e.productId] && products.add(PRODUCT_NAMES[e.productId]))
+  nonRevoked.forEach((e) => PRODUCT_NAMES[e.productId] && products.add(PRODUCT_NAMES[e.productId]))
+  if (signupSource === 'rezume_signup') products.add('Rezume')
+  if (signupSource === 'aicoach_signup') products.add('AI Interview Coach')
 
-  const hasBundle = activeEntitlements.some((e) => e.source === 'bundle')
-  const hasPaid = activeEntitlements.some((e) => ['direct', 'promo', 'manual'].includes(e.source))
+  // Membership_Type = CURRENT tier, from active entitlements.
+  let membershipType: ClassifiedSource['membershipType'] = 'Free'
+  if (active.some((e) => e.source === 'bundle')) membershipType = 'Bundle'
+  else if (active.some((e) => ['direct', 'manual', 'promo'].includes(e.source))) membershipType = 'Paid'
 
-  let membershipType: ClassifiedSource['membershipType']
-  let leadSource: string | null
-
-  if (hasBundle) {
-    membershipType = 'Bundle'
+  // Lead_Source = ACQUISITION channel (how they came in): bundle > direct > free.
+  // Manual/promo are admin grants, not acquisition channels, so they don't set it.
+  let leadSource: string | null = null
+  if (nonRevoked.some((e) => e.source === 'bundle')) {
     leadSource = 'Bundle'
-  } else if (hasPaid) {
-    membershipType = 'Paid'
-    const paid = activeEntitlements.find((e) => e.source === 'direct') || activeEntitlements[0]
-    const app = APP_LABEL[paid?.sourceApp || ''] || 'Rezume'
-    leadSource = `${app} - Paid`
   } else {
-    membershipType = 'Free'
-    const app = APP_LABEL[signupSource || '']
-    leadSource = app ? `${app} - Free` : null
-    if (signupSource === 'rezume_signup') products.add('Rezume')
-    if (signupSource === 'aicoach_signup') products.add('AI Interview Coach')
+    const direct = nonRevoked.find((e) => e.source === 'direct')
+    if (direct) {
+      leadSource = `${APP_LABEL[direct.sourceApp || ''] || 'Rezume'} - Paid`
+    } else if (APP_LABEL[signupSource || '']) {
+      leadSource = `${APP_LABEL[signupSource || '']} - Free`
+    }
   }
 
   return { membershipType, leadSource, aiProducts: Array.from(products).join(', ') }
@@ -137,12 +149,16 @@ export async function syncContactToZoho(email: string): Promise<void> {
     })
     if (!identity) return
 
-    const now = new Date()
-    const active = identity.entitlements.filter((e) => !e.revokedAt && (!e.expiresAt || e.expiresAt > now))
     const { membershipType, leadSource, aiProducts } = classify(
       (identity as { signupSource?: string | null }).signupSource ?? null,
       identity.emails.map((e) => e.productId),
-      active.map((e) => ({ source: e.source, sourceApp: e.sourceApp, productId: e.productId }))
+      identity.entitlements.map((e) => ({
+        source: e.source,
+        sourceApp: e.sourceApp,
+        productId: e.productId,
+        revokedAt: e.revokedAt,
+        expiresAt: e.expiresAt,
+      }))
     )
 
     const nameParts = (identity.fullName || '').trim().split(/\s+/).filter(Boolean)
