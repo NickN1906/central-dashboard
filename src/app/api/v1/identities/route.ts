@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { getOrCreateIdentity, linkEmailToIdentity } from '@/lib/services/entitlements.service'
+import { syncContactToZohoAsync } from '@/lib/services/zoho.service'
 
 const ADMIN_API_KEY = process.env.CENTRAL_DASHBOARD_API_KEY
 
@@ -70,6 +71,9 @@ export async function POST(request: NextRequest) {
     } else {
       console.warn(`[Identities] Product '${productId}' not found — identity created but email not linked`)
     }
+
+    // Push to Zoho CRM (fire-and-forget)
+    syncContactToZohoAsync(normalizedEmail)
 
     return NextResponse.json({ success: true, identityId: identity.id, linked })
   } catch (error) {

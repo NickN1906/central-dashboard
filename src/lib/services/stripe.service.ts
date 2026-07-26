@@ -8,6 +8,7 @@ import {
 } from './entitlements.service'
 import { sendBundlePurchaseEmail } from './email.service'
 import { grantAccessAndSync, revokeAccessAndSync } from './app-sync.service'
+import { syncContactToZohoAsync } from './zoho.service'
 import { DurationType } from '@/lib/types'
 
 let _stripe: Stripe | null = null
@@ -166,6 +167,9 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
   )
   console.log('[Stripe] App sync results:', syncResults)
 
+  // Push bundle purchase to Zoho CRM (fire-and-forget)
+  syncContactToZohoAsync(customerEmail)
+
   return {
     handled: true,
     action: 'access_granted',
@@ -254,6 +258,9 @@ export async function handleSubscriptionUpdated(subscription: Stripe.Subscriptio
     console.log('[Stripe] Revocation sync results:', syncResults)
   }
 
+  // Push updated membership to Zoho CRM (fire-and-forget)
+  syncContactToZohoAsync(identity.primaryEmail)
+
   return { handled: true }
 }
 
@@ -305,6 +312,9 @@ export async function handleSubscriptionDeleted(subscription: Stripe.Subscriptio
     )
     console.log('[Stripe] Subscription deleted sync results:', syncResults)
   }
+
+  // Push updated membership to Zoho CRM (fire-and-forget)
+  syncContactToZohoAsync(identity.primaryEmail)
 
   return { handled: true }
 }

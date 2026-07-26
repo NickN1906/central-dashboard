@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { reportExternalSubscription } from '@/lib/services/entitlements.service'
+import { syncContactToZohoAsync } from '@/lib/services/zoho.service'
 
 const ADMIN_API_KEY = process.env.CENTRAL_DASHBOARD_API_KEY
 
@@ -109,6 +110,9 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`[Report] ${action} subscription reported from ${sourceApp} for ${email} (${productId})`)
+
+    // Push updated membership to Zoho CRM (fire-and-forget)
+    syncContactToZohoAsync(email)
 
     return NextResponse.json({
       ...result,
