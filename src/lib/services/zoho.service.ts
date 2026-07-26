@@ -194,8 +194,14 @@ export async function syncContactToZoho(email: string): Promise<void> {
       fields.Membership_Type = membershipType
       if (leadSource) fields.Lead_Source = leadSource
       if (consented) fields.Marketing_Consent = true
-      if (firstName && !existing.First_Name) fields.First_Name = firstName
-      if (lastName && !existing.Last_Name) fields.Last_Name = lastName
+      // Fill name if blank, and also replace our own email-fallback placeholder
+      // (contact we created earlier with Last_Name = email local-part). Never
+      // overwrite a genuine, user-provided name.
+      const emailLocal = normalized.split('@')[0]
+      const nameIsPlaceholder =
+        !existing.First_Name && (existing.Last_Name === emailLocal || existing.Last_Name === normalized)
+      if (firstName && (!existing.First_Name || nameIsPlaceholder)) fields.First_Name = firstName
+      if (lastName && (!existing.Last_Name || nameIsPlaceholder)) fields.Last_Name = lastName
 
       await zohoRequest(`${MODULE}/${existing.id}`, token, {
         method: 'PUT',
