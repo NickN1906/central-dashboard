@@ -22,6 +22,7 @@ export default function GrantPage() {
   const [submitting, setSubmitting] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
+    fullName: '',
     productIds: [] as string[],
     source: 'manual',
     reason: '',
@@ -87,6 +88,7 @@ export default function GrantPage() {
         toast.success('Access granted successfully!')
         setFormData({
           email: '',
+          fullName: '',
           productIds: [],
           source: 'manual',
           reason: '',
@@ -136,6 +138,20 @@ export default function GrantPage() {
               />
               <p className="text-xs text-gray-500">
                 If user doesn&apos;t exist, an identity will be created
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="fullName">Full Name (optional)</Label>
+              <Input
+                id="fullName"
+                type="text"
+                placeholder="Jane Doe"
+                value={formData.fullName}
+                onChange={(e) => setFormData({ ...formData, fullName: e.target.value })}
+              />
+              <p className="text-xs text-gray-500">
+                Stored on the identity and synced to the CRM
               </p>
             </div>
 

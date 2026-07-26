@@ -48,6 +48,7 @@ interface Bundle {
 interface User {
   id: string
   primaryEmail: string
+  fullName: string | null
   createdAt: string
   emails: { email: string; productId: string }[]
   entitlements: Entitlement[]
@@ -383,9 +384,9 @@ export default function UsersPage() {
                 <CardHeader className="pb-2">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-lg">{user.primaryEmail}</CardTitle>
+                      <CardTitle className="text-lg">{user.fullName || user.primaryEmail}</CardTitle>
                       <p className="text-sm text-gray-500">
-                        Joined {new Date(user.createdAt).toLocaleDateString()}
+                        {user.fullName ? `${user.primaryEmail} · ` : ''}Joined {new Date(user.createdAt).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="flex gap-2 items-center">

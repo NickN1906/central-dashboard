@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { verifyAdminAuth } from '@/lib/middleware/admin-auth'
 import { grantAccess, getOrCreateIdentity } from '@/lib/services/entitlements.service'
+import { syncContactToZohoAsync } from '@/lib/services/zoho.service'
 import { DurationType } from '@/lib/types'
 
 /**
@@ -91,6 +92,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const {
       email,
+      fullName,
       productIds,
       source = 'manual',
       reason,
@@ -107,6 +109,14 @@ export async function POST(request: NextRequest) {
 
     // Create or get identity
     const identity = await getOrCreateIdentity(email)
+
+    // Capture the name (fills a blank; never blanks an existing one).
+    if (typeof fullName === 'string' && fullName.trim() && !identity.fullName) {
+      await prisma.identity.update({
+        where: { id: identity.id },
+        data: { fullName: fullName.trim() }
+      })
+    }
 
     // Link email to identity for each product
     for (const productId of productIds) {
@@ -142,6 +152,9 @@ export async function POST(request: NextRequest) {
         details: { email, reason, durationType, durationValue }
       }
     })
+
+    // Push the manual grant (and any captured name) to Zoho CRM.
+    syncContactToZohoAsync(email)
 
     return NextResponse.json({
       success: true,

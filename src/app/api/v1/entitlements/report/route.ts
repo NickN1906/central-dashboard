@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import prisma from '@/lib/db'
 import { reportExternalSubscription } from '@/lib/services/entitlements.service'
 import { syncContactToZohoAsync } from '@/lib/services/zoho.service'
 
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
 
     const {
       email,
+      fullName,
       productId,
       action,
       sourceApp,
@@ -110,6 +112,14 @@ export async function POST(request: NextRequest) {
     })
 
     console.log(`[Report] ${action} subscription reported from ${sourceApp} for ${email} (${productId})`)
+
+    // Capture the reporter-provided name onto the identity if we don't have one.
+    if (typeof fullName === 'string' && fullName.trim()) {
+      await prisma.identity.updateMany({
+        where: { primaryEmail: email.toLowerCase(), fullName: null },
+        data: { fullName: fullName.trim() }
+      })
+    }
 
     // Push updated membership to Zoho CRM (fire-and-forget)
     syncContactToZohoAsync(email)
