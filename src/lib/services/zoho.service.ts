@@ -143,6 +143,10 @@ export async function syncContactToZoho(email: string): Promise<void> {
     if (!token) return
 
     const normalized = email.toLowerCase().trim()
+    // Never push test/placeholder addresses to the CRM.
+    if (normalized.endsWith('@example.com') || normalized.includes('@test.') || normalized.endsWith('.test')) {
+      return
+    }
     const identity = await prisma.identity.findFirst({
       where: { primaryEmail: normalized },
       include: { emails: true, entitlements: true },
