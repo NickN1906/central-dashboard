@@ -78,6 +78,8 @@ interface EntitlementLite {
   productId: string
   revokedAt: Date | null
   expiresAt: Date | null
+  grantedAt: Date
+  bundleName: string | null
 }
 
 function classify(
@@ -104,8 +106,13 @@ function classify(
   // Lead_Source = ACQUISITION channel (how they came in): bundle > direct > free.
   // Manual/promo are admin grants, not acquisition channels, so they don't set it.
   let leadSource: string | null = null
-  if (nonRevoked.some((e) => e.source === 'bundle')) {
-    leadSource = 'Bundle'
+  const bundleEnts = nonRevoked.filter((e) => e.source === 'bundle')
+  if (bundleEnts.length > 0) {
+    // Use the most recently granted bundle's name.
+    const named = bundleEnts
+      .filter((e) => e.bundleName)
+      .sort((a, b) => b.grantedAt.getTime() - a.grantedAt.getTime())
+    leadSource = named.length > 0 ? `Bundle: ${named[0].bundleName}` : 'Bundle'
   } else {
     const direct = nonRevoked.find((e) => e.source === 'direct')
     if (direct) {
@@ -149,7 +156,7 @@ export async function syncContactToZoho(email: string): Promise<void> {
     }
     const identity = await prisma.identity.findFirst({
       where: { primaryEmail: normalized },
-      include: { emails: true, entitlements: true },
+      include: { emails: true, entitlements: { include: { bundle: true } } },
     })
     if (!identity) return
 
@@ -162,8 +169,11 @@ export async function syncContactToZoho(email: string): Promise<void> {
         productId: e.productId,
         revokedAt: e.revokedAt,
         expiresAt: e.expiresAt,
+        grantedAt: e.grantedAt,
+        bundleName: e.bundle?.name ?? null,
       }))
     )
+    const consented = (identity as { marketingConsent?: boolean }).marketingConsent === true
 
     const nameParts = (identity.fullName || '').trim().split(/\s+/).filter(Boolean)
     const firstName = nameParts.length > 1 ? nameParts[0] : ''
@@ -183,6 +193,7 @@ export async function syncContactToZoho(email: string): Promise<void> {
       if (aiProducts) fields.AI_Products = aiProducts
       fields.Membership_Type = membershipType
       if (leadSource) fields.Lead_Source = leadSource
+      if (consented) fields.Marketing_Consent = true
       if (firstName && !existing.First_Name) fields.First_Name = firstName
       if (lastName && !existing.Last_Name) fields.Last_Name = lastName
 
@@ -199,6 +210,7 @@ export async function syncContactToZoho(email: string): Promise<void> {
       if (firstName) data.First_Name = firstName
       if (aiProducts) data.AI_Products = aiProducts
       if (leadSource) data.Lead_Source = leadSource
+      if (consented) data.Marketing_Consent = true
 
       await zohoRequest(MODULE, token, {
         method: 'POST',
