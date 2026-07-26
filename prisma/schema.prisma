@@ -67,6 +67,9 @@ model Identity {
   id               String   @id @default(cuid())
   primaryEmail     String   @map("primary_email") // Purchase email
   stripeCustomerId String?  @unique @map("stripe_customer_id")
+  fullName         String?  @map("full_name") // CRM: captured at signup
+  marketingConsent Boolean  @default(false) @map("marketing_consent") // CRM: consent at signup
+  signupSource     String?  @map("signup_source") // e.g. 'rezume_signup'
   createdAt        DateTime @default(now()) @map("created_at")
   updatedAt        DateTime @updatedAt @map("updated_at")
 
