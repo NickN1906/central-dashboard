@@ -2,7 +2,7 @@ import prisma from '@/lib/db'
 import { calculateExpiryDate, DurationType } from '@/lib/types'
 import { nanoid } from 'nanoid'
 import { Prisma } from '@prisma/client'
-import { revokeAccessAndSync } from './app-sync.service'
+import { revokeAccessAndSync, scheduleCancellationOnApp } from './app-sync.service'
 
 interface AccessResult {
   hasAccess: boolean
@@ -356,6 +356,76 @@ export async function reportExternalSubscription(params: {
 
     return { success: true, action: 'revoked', sourceApp }
   }
+}
+
+/**
+ * Schedule an END-OF-PERIOD cancellation for a user's product subscription,
+ * initiated by the user themselves through the product app (self-serve cancel).
+ *
+ * Unlike revokeAccess (immediate, admin hard-revoke), this keeps access until the
+ * billing period ends:
+ *   1. Ask the app to set cancel_at_period_end on its Stripe subscription.
+ *   2. Set the entitlement's expiresAt = period end (do NOT revoke it now).
+ *   3. When the period ends, Stripe's subscription.deleted webhook does the final revoke.
+ */
+export async function scheduleCancellation(params: {
+  email: string
+  productId: string
+  sourceApp: 'rezume' | 'aicoach' | '123jobs-resume' | '123jobs-interview'
+}): Promise<{ success: boolean; periodEnd: string | null; error?: string }> {
+  const { email, productId, sourceApp } = params
+  const normalizedEmail = email.toLowerCase()
+
+  // Ask the app to schedule the Stripe cancellation and report the period end.
+  const appResult = await scheduleCancellationOnApp(sourceApp, normalizedEmail)
+
+  if (!appResult.success) {
+    await prisma.auditLog.create({
+      data: {
+        action: 'schedule_cancel_failed',
+        productIds: [productId],
+        details: { email: normalizedEmail, sourceApp, error: appResult.error }
+      }
+    })
+    return { success: false, periodEnd: null, error: appResult.error || 'App failed to schedule cancellation' }
+  }
+
+  const periodEnd = appResult.currentPeriodEnd ?? null
+
+  // Resolve the identity and record the pending cancellation. Access is retained:
+  // we set expiresAt = period end rather than revoking now.
+  const identity = await prisma.identity.findFirst({
+    where: { primaryEmail: normalizedEmail }
+  })
+
+  if (identity) {
+    await prisma.entitlement.updateMany({
+      where: {
+        identityId: identity.id,
+        productId,
+        source: 'direct',
+        sourceApp,
+        revokedAt: null
+      },
+      // Keep the entitlement active; access ends naturally at expiresAt.
+      data: {
+        expiresAt: periodEnd ? new Date(periodEnd) : undefined
+      }
+    })
+
+    await prisma.auditLog.create({
+      data: {
+        action: 'schedule_cancel',
+        identityId: identity.id,
+        productIds: [productId],
+        details: { sourceApp, periodEnd, initiatedBy: 'user' }
+      }
+    })
+  } else {
+    console.warn(`[ScheduleCancel] No identity found for ${normalizedEmail}; Stripe cancel still scheduled`)
+  }
+
+  return { success: true, periodEnd }
 }
 
 /**

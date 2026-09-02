@@ -218,6 +218,74 @@ export async function revokeAccessAndSync(
 }
 
 /**
+ * Ask an app to schedule an END-OF-PERIOD cancellation of its own Stripe
+ * subscription (cancel_at_period_end = true). Unlike revokeAccessAndSync, this
+ * does NOT revoke access — the user keeps it until the billing period ends,
+ * at which point Stripe's subscription.deleted webhook performs the final revoke.
+ *
+ * Returns the app's response, including currentPeriodEnd (ISO string or null).
+ */
+export async function scheduleCancellationOnApp(
+  appKey: string,
+  email: string
+): Promise<SyncResult & { currentPeriodEnd?: string | null }> {
+  const config = APP_CONFIG[appKey]
+
+  if (!config) {
+    return { app: appKey, success: false, error: `Unknown app: ${appKey}` }
+  }
+
+  if (!ADMIN_API_KEY) {
+    console.error(
+      `[AppSync] CENTRAL_DASHBOARD_API_KEY not configured - cannot schedule cancel on ${config.name}`
+    )
+    return { app: config.name, success: false, error: 'API key not configured' }
+  }
+
+  try {
+    const response = await fetch(
+      `${config.baseUrl}/api/admin/schedule-cancellation`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Admin-Api-Key': ADMIN_API_KEY,
+        },
+        body: JSON.stringify({ email }),
+        signal: AbortSignal.timeout(15000),
+      }
+    )
+
+    const data = await response.json().catch(() => ({}))
+
+    if (!response.ok) {
+      console.error(
+        `[AppSync] Failed to schedule cancel on ${config.name}: ${response.status}`,
+        data
+      )
+      return {
+        app: config.name,
+        success: false,
+        error: `HTTP ${response.status}`,
+        response: data,
+      }
+    }
+
+    console.log(`[AppSync] Scheduled cancel on ${config.name}:`, data)
+    return {
+      app: config.name,
+      success: true,
+      response: data,
+      currentPeriodEnd: data.currentPeriodEnd ?? null,
+    }
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    console.error(`[AppSync] Error scheduling cancel on ${config.name}:`, errorMessage)
+    return { app: config.name, success: false, error: errorMessage }
+  }
+}
+
+/**
  * Clear caches on all apps for a user
  */
 export async function clearCachesOnApps(
