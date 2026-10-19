@@ -9,6 +9,7 @@ interface AccessResult {
   product: string
   source?: string
   bundleName?: string
+  bundleKind?: string // 'bundle' | 'plan' — lets apps word one-time access correctly
   expires?: string | null
   grantedAt?: string
 }
@@ -69,16 +70,27 @@ export async function checkAccess(email: string, productId: string): Promise<Acc
       return { hasAccess: false, product: productId }
     }
 
-    const entitlement = identity.entitlements[0]
-    return checkEntitlementAccess(entitlement, productId)
+    return checkEntitlementAccess(pickLongestEntitlement(identity.entitlements), productId)
   }
 
   if (identityEmail.identity.entitlements.length === 0) {
     return { hasAccess: false, product: productId }
   }
 
-  const entitlement = identityEmail.identity.entitlements[0]
-  return checkEntitlementAccess(entitlement, productId)
+  return checkEntitlementAccess(pickLongestEntitlement(identityEmail.identity.entitlements), productId)
+}
+
+/**
+ * A user can hold several active entitlements for one product (e.g. a monthly
+ * subscription AND a 6-month plan). Report the one that covers them the longest
+ * so apps show the real end of access: never-expiring wins, then latest expiry.
+ */
+function pickLongestEntitlement<T extends { expiresAt: Date | null }>(entitlements: T[]): T {
+  return entitlements.reduce((best, e) => {
+    if (best.expiresAt === null) return best
+    if (e.expiresAt === null) return e
+    return e.expiresAt > best.expiresAt ? e : best
+  })
 }
 
 function checkEntitlementAccess(
@@ -87,7 +99,7 @@ function checkEntitlementAccess(
     expiresAt: Date | null
     grantedAt: Date
     source: string
-    bundle?: { name: string } | null
+    bundle?: { name: string; kind: string } | null
   },
   productId: string
 ): AccessResult {
@@ -106,6 +118,7 @@ function checkEntitlementAccess(
     product: productId,
     source: entitlement.source,
     bundleName: entitlement.bundle?.name,
+    bundleKind: entitlement.bundle?.kind,
     expires: entitlement.expiresAt?.toISOString() || null,
     grantedAt: entitlement.grantedAt.toISOString()
   }
@@ -154,6 +167,14 @@ export async function grantAccess(params: {
   stripePriceId?: string
   amountPaid?: number
   currency?: string
+  /**
+   * What to do when the customer already has live access from this source:
+   *  - 'replace'    (default, admin grants): apply the new expiry exactly.
+   *  - 'keepLonger' (subscription purchases): never shorten existing access.
+   *  - 'extend'     (one-time purchases): add the new duration on top of the
+   *                 current end date, so buying early never loses paid time.
+   */
+  onExisting?: 'replace' | 'keepLonger' | 'extend'
 }) {
   const {
     identityId,
@@ -166,10 +187,11 @@ export async function grantAccess(params: {
     stripeSubscriptionId,
     stripePriceId,
     amountPaid,
-    currency
+    currency,
+    onExisting = 'replace'
   } = params
 
-  const expiresAt = calculateExpiryDate(durationType, durationValue)
+  const newExpiresAt = calculateExpiryDate(durationType, durationValue)
 
   const entitlements = await Promise.all(
     productIds.map(async (productId) => {
@@ -185,6 +207,7 @@ export async function grantAccess(params: {
       })
 
       if (existingEntitlement) {
+        const expiresAt = resolveExpiry(existingEntitlement, newExpiresAt, onExisting, durationType, durationValue)
         return prisma.entitlement.update({
           where: { id: existingEntitlement.id },
           data: {
@@ -207,7 +230,7 @@ export async function grantAccess(params: {
           source,
           sourceApp,
           bundleId,
-          expiresAt,
+          expiresAt: newExpiresAt,
           stripeSubscriptionId,
           stripePriceId,
           amountPaid,
@@ -223,11 +246,47 @@ export async function grantAccess(params: {
       action: 'grant',
       identityId,
       productIds,
-      details: { source, sourceApp, bundleId, expiresAt, stripePriceId, amountPaid, currency }
+      details: {
+        source,
+        sourceApp,
+        bundleId,
+        expiresAt: newExpiresAt,
+        onExisting,
+        resultingExpiries: entitlements.map((e) => ({ productId: e.productId, expiresAt: e.expiresAt })),
+        stripePriceId,
+        amountPaid,
+        currency
+      }
     }
   })
 
   return entitlements
+}
+
+/**
+ * Work out the expiry when re-granting over an existing entitlement. Existing
+ * access only counts while it is still live (not revoked, not expired) —
+ * otherwise the new grant starts fresh from today.
+ */
+function resolveExpiry(
+  existing: { expiresAt: Date | null; revokedAt: Date | null },
+  newExpiresAt: Date | null,
+  onExisting: 'replace' | 'keepLonger' | 'extend',
+  durationType: DurationType,
+  durationValue: number | null
+): Date | null {
+  if (onExisting === 'replace') return newExpiresAt
+
+  const now = new Date()
+  const existingLive = !existing.revokedAt && (existing.expiresAt === null || existing.expiresAt > now)
+  if (!existingLive) return newExpiresAt
+  // Never-expiring access (on either side) stays never-expiring.
+  if (existing.expiresAt === null || newExpiresAt === null) return null
+
+  if (onExisting === 'extend') {
+    return calculateExpiryDate(durationType, durationValue, existing.expiresAt)
+  }
+  return existing.expiresAt > newExpiresAt ? existing.expiresAt : newExpiresAt
 }
 
 /**
@@ -721,7 +780,8 @@ export async function processClaim(
     source: 'bundle',
     bundleId: bundle.id,
     durationType: bundle.durationType as DurationType,
-    durationValue: bundle.durationValue
+    durationValue: bundle.durationValue,
+    onExisting: 'extend'
   })
 
   // Mark token as claimed

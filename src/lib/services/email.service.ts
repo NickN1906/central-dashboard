@@ -18,6 +18,8 @@ interface BundlePurchaseEmailData {
   bundleName: string
   productIds: string[]
   expiresAt?: Date
+  oneTime?: boolean // one-time payment: say clearly that nothing renews
+  endedSubscriptions?: string[] // lines about subscriptions stopped to avoid double billing
 }
 
 /**
@@ -31,13 +33,17 @@ export async function sendBundlePurchaseEmail(data: BundlePurchaseEmailData): Pr
     return false
   }
 
-  const { customerEmail, customerName, bundleName, productIds, expiresAt } = data
+  const { customerEmail, customerName, bundleName, productIds, expiresAt, oneTime, endedSubscriptions = [] } = data
   const name = customerName || 'there'
 
   // Format expiry date if provided
-  const expiryText = expiresAt
-    ? `Your access is valid until ${expiresAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.`
-    : ''
+  const expiryText = [
+    expiresAt
+      ? `Your access is valid until ${expiresAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}.`
+      : '',
+    oneTime ? 'This was a one-time payment — it will not renew and you will not be charged again.' : '',
+    ...endedSubscriptions
+  ].filter(Boolean).join(' ')
 
   // Determine which products are included (check multiple possible IDs)
   const lowerProductIds = productIds.map(id => id.toLowerCase())

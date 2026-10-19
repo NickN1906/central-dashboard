@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { verifyAdminAuth } from '@/lib/middleware/admin-auth'
+import { BUNDLE_KINDS } from '@/lib/types'
 
 /**
  * GET /api/v1/admin/bundles/:id
@@ -69,8 +70,16 @@ export async function PUT(
       productIds,
       durationType,
       durationValue,
+      kind,
       isActive
     } = body
+
+    if (kind !== undefined && !BUNDLE_KINDS.includes(kind)) {
+      return NextResponse.json(
+        { error: `kind must be one of: ${BUNDLE_KINDS.join(', ')}` },
+        { status: 400 }
+      )
+    }
 
     // Check for conflicts if updating slug or stripePriceId
     if (slug) {
@@ -107,6 +116,7 @@ export async function PUT(
         ...(productIds !== undefined && { productIds }),
         ...(durationType !== undefined && { durationType }),
         ...(durationValue !== undefined && { durationValue }),
+        ...(kind !== undefined && { kind }),
         ...(isActive !== undefined && { isActive })
       }
     })

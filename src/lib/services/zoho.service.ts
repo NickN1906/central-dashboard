@@ -164,8 +164,10 @@ export async function syncContactToZoho(email: string): Promise<void> {
       (identity as { signupSource?: string | null }).signupSource ?? null,
       identity.emails.map((e) => e.productId),
       identity.entitlements.map((e) => ({
-        source: e.source,
-        sourceApp: e.sourceApp,
+        // A single-app plan sold through Central (e.g. Rezume 6 months) is a paid
+        // plan for that app, not a bundle — classify it as Paid / "<App> - Paid".
+        source: e.bundle?.kind === 'plan' ? 'direct' : e.source,
+        sourceApp: e.bundle?.kind === 'plan' ? e.productId : e.sourceApp,
         productId: e.productId,
         revokedAt: e.revokedAt,
         expiresAt: e.expiresAt,

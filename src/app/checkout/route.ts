@@ -54,11 +54,14 @@ export async function GET(request: NextRequest) {
       apiVersion: '2025-12-15.clover'
     })
 
-    // Central Dashboard is the master - use bundle's durationType to determine checkout mode
-    // durationType: 'days', 'months', 'years' = subscription | 'lifetime' = one-time payment
-    const isSubscription = bundle.durationType !== 'lifetime'
+    // The Stripe price decides the checkout mode: a recurring price needs a
+    // subscription checkout, a one-time price a payment checkout. (Time-limited
+    // one-time bundles like "6 months" are one-time prices, so durationType
+    // alone can't tell us.)
+    const price = await stripe.prices.retrieve(priceId)
+    const isSubscription = price.type === 'recurring'
 
-    console.log(`[Checkout] Bundle "${bundle.name}" durationType: ${bundle.durationType} (${isSubscription ? 'subscription' : 'payment'} mode)`)
+    console.log(`[Checkout] Bundle "${bundle.name}" price type: ${price.type} (${isSubscription ? 'subscription' : 'payment'} mode)`)
 
     // Create Stripe checkout session
     const session = await stripe.checkout.sessions.create({
@@ -83,8 +86,9 @@ export async function GET(request: NextRequest) {
       automatic_tax: { enabled: true },
       // Enable coupon/promo codes at checkout
       allow_promotion_codes: allowPromotionCodes,
-      // customer_creation only works in payment mode, not subscription mode
-      ...(isSubscription ? {} : { customer_creation: 'always' }),
+      // customer_creation / invoice_creation only work in payment mode. The
+      // invoice gives one-time buyers a proper receipt showing the tax charged.
+      ...(isSubscription ? {} : { customer_creation: 'always', invoice_creation: { enabled: true } }),
     })
 
     if (!session.url) {

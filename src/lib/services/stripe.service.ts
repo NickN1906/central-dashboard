@@ -7,7 +7,7 @@ import {
   grantAccess
 } from './entitlements.service'
 import { sendBundlePurchaseEmail } from './email.service'
-import { grantAccessAndSync, revokeAccessAndSync } from './app-sync.service'
+import { grantAccessAndSync, revokeAccessAndSync, scheduleCancellationOnApp } from './app-sync.service'
 import { syncContactToZohoAsync } from './zoho.service'
 import { DurationType } from '@/lib/types'
 
@@ -130,25 +130,36 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     })
   }
 
-  // Calculate expiry date for email
-  const expiresAt = new Date()
-  const durationValue = bundle.durationValue ?? 0
-  if (bundle.durationType === 'days') {
-    expiresAt.setDate(expiresAt.getDate() + durationValue)
-  } else if (bundle.durationType === 'months') {
-    expiresAt.setMonth(expiresAt.getMonth() + durationValue)
-  } else if (bundle.durationType === 'years') {
-    expiresAt.setFullYear(expiresAt.getFullYear() + durationValue)
-  }
-
-  await grantAccess({
+  const granted = await grantAccess({
     identityId: identity.id,
     productIds: bundle.productIds,
     source: 'bundle',
     bundleId: bundle.id,
     durationType: bundle.durationType as DurationType,
-    durationValue: bundle.durationValue
+    durationValue: bundle.durationValue,
+    stripePriceId: priceId,
+    amountPaid: session.amount_total ?? undefined,
+    currency: session.currency ?? undefined,
+    // A purchase must never cut short access the customer already has. A
+    // one-time purchase adds its full duration on top of their current end
+    // date (buying early never loses paid time); a subscription keeps the later.
+    onExisting: session.mode === 'payment' ? 'extend' : 'keepLonger'
   })
+
+  // The email shows the date access actually ends (which may be later than
+  // "now + duration" when the customer already had access).
+  const expiries = granted.map((e) => e.expiresAt)
+  const expiresAt = expiries.some((d) => d === null)
+    ? undefined
+    : new Date(Math.max(...expiries.map((d) => (d as Date).getTime())))
+
+  // One-time purchase by someone who already subscribes to one of the apps in
+  // it: stop that subscription at the end of its current period so they are
+  // not billed twice for access they now have. Never fails the webhook.
+  const isOneTime = session.mode === 'payment'
+  const endedSubscriptions = isOneTime
+    ? await endOverlappingSubscriptions(identity.id, customerEmail, bundle.productIds)
+    : []
 
   // Send confirmation email with instructions
   await sendBundlePurchaseEmail({
@@ -156,7 +167,9 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     customerName: session.customer_details?.name || undefined,
     bundleName: bundle.name,
     productIds: bundle.productIds,
-    expiresAt: bundle.durationType !== 'lifetime' ? expiresAt : undefined
+    expiresAt,
+    oneTime: isOneTime,
+    endedSubscriptions
   })
 
   // Sync access to connected apps (Rezume, AI Coach)
@@ -177,6 +190,71 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     products: bundle.productIds,
     syncResults
   }
+}
+
+// Apps whose own Stripe subscriptions a one-time purchase can make redundant.
+const SUBSCRIPTION_APPS: Record<string, string> = {
+  rezume: 'Rezume',
+  aicoach: 'AI Interview Coach',
+}
+
+/**
+ * For each app in a one-time purchase where the customer also has a live
+ * subscription, ask that app to cancel the subscription at period end (access
+ * continues until then, and the new purchase covers them after). Returns a
+ * customer-facing line per subscription ended, for the confirmation email.
+ */
+async function endOverlappingSubscriptions(
+  identityId: string,
+  email: string,
+  productIds: string[]
+): Promise<string[]> {
+  const lines: string[] = []
+  try {
+    const live = await prisma.entitlement.findMany({
+      where: {
+        identityId,
+        productId: { in: productIds.filter((id) => id in SUBSCRIPTION_APPS) },
+        source: 'direct',
+        revokedAt: null,
+        stripeSubscriptionId: { not: null },
+        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }]
+      }
+    })
+    const apps = [...new Set(live.map((e) => e.sourceApp).filter((a): a is string => !!a && a in SUBSCRIPTION_APPS))]
+
+    for (const app of apps) {
+      const result = await scheduleCancellationOnApp(app, email)
+      await prisma.auditLog.create({
+        data: {
+          action: result.success ? 'auto_cancel_overlap' : 'auto_cancel_overlap_failed',
+          identityId,
+          productIds: [app],
+          details: { email, periodEnd: result.currentPeriodEnd ?? null, error: result.error }
+        }
+      })
+
+      if (!result.success) {
+        console.error(`[Stripe] Could not end overlapping ${app} subscription for ${email}:`, result.error)
+        continue
+      }
+
+      if (result.currentPeriodEnd) {
+        await prisma.entitlement.updateMany({
+          where: { identityId, productId: app, source: 'direct', sourceApp: app, revokedAt: null },
+          data: { expiresAt: new Date(result.currentPeriodEnd) }
+        })
+      }
+
+      const until = result.currentPeriodEnd
+        ? ` on ${new Date(result.currentPeriodEnd).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`
+        : ' at the end of its current billing period'
+      lines.push(`Your ${SUBSCRIPTION_APPS[app]} subscription will end${until} and will not renew, so you won't be charged twice.`)
+    }
+  } catch (error) {
+    console.error('[Stripe] Error ending overlapping subscriptions:', error)
+  }
+  return lines
 }
 
 /**

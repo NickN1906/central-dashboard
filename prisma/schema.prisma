@@ -48,6 +48,10 @@ model Bundle {
   productIds    String[] @map("product_ids") // ['rezume', 'coach', 'career']
   durationType  String   @default("lifetime") @map("duration_type") // 'days', 'months', 'years', 'lifetime'
   durationValue Int?     @map("duration_value") // e.g., 3 for 3 months
+  // 'bundle' = multi-product package (A-Game, Power Pack, Tools pair)
+  // 'plan'   = a single app's one-time plan sold through Central (e.g. Rezume 6 months).
+  // Drives customer-facing wording (emails) and Zoho Membership_Type (Paid vs Bundle).
+  kind          String   @default("bundle")
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")

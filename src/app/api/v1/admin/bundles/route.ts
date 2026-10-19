@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import prisma from '@/lib/db'
 import { verifyAdminAuth } from '@/lib/middleware/admin-auth'
+import { BUNDLE_KINDS } from '@/lib/types'
 
 /**
  * GET /api/v1/admin/bundles
@@ -66,8 +67,16 @@ export async function POST(request: NextRequest) {
       stripePriceId,
       productIds,
       durationType = 'lifetime',
-      durationValue
+      durationValue,
+      kind = 'bundle'
     } = body
+
+    if (!BUNDLE_KINDS.includes(kind)) {
+      return NextResponse.json(
+        { error: `kind must be one of: ${BUNDLE_KINDS.join(', ')}` },
+        { status: 400 }
+      )
+    }
 
     if (!name || !slug || !stripePriceId || !productIds || productIds.length === 0) {
       return NextResponse.json(
@@ -112,7 +121,8 @@ export async function POST(request: NextRequest) {
         stripePriceId,
         productIds,
         durationType,
-        durationValue
+        durationValue,
+        kind
       }
     })
 

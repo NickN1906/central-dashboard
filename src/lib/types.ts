@@ -94,6 +94,7 @@ export interface BundleWithStats {
   productIds: string[]
   durationType: string
   durationValue: number | null
+  kind: string
   isActive: boolean
   _count: {
     entitlements: number
@@ -142,18 +143,22 @@ export interface AnalyticsOverview {
   }[]
 }
 
+// Bundle kinds: a multi-product 'bundle', or a single app's one-time 'plan'
+export const BUNDLE_KINDS = ['bundle', 'plan']
+
 // Duration calculation
 export type DurationType = 'days' | 'months' | 'years' | 'lifetime'
 
 export function calculateExpiryDate(
   durationType: DurationType,
-  durationValue: number | null
+  durationValue: number | null,
+  from: Date = new Date() // start date; defaults to now
 ): Date | null {
   if (durationType === 'lifetime' || !durationValue) {
     return null
   }
 
-  const now = new Date()
+  const now = new Date(from)
 
   switch (durationType) {
     case 'days':
