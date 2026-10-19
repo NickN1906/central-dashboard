@@ -78,6 +78,9 @@ export async function GET(request: NextRequest) {
         product_ids: bundle.productIds.join(','),
       },
       billing_address_collection: 'required',
+      // Stripe only calculates tax when automatic_tax is enabled on the session
+      // itself — account-wide Stripe Tax does not apply to API-created checkouts.
+      automatic_tax: { enabled: true },
       // Enable coupon/promo codes at checkout
       allow_promotion_codes: allowPromotionCodes,
       // customer_creation only works in payment mode, not subscription mode
