@@ -68,7 +68,8 @@ export async function POST(request: NextRequest) {
       productIds,
       durationType = 'lifetime',
       durationValue,
-      kind = 'bundle'
+      kind = 'bundle',
+      heartbeatInvitationId = null
     } = body
 
     if (!BUNDLE_KINDS.includes(kind)) {
@@ -122,7 +123,8 @@ export async function POST(request: NextRequest) {
         productIds,
         durationType,
         durationValue,
-        kind
+        kind,
+        heartbeatInvitationId: heartbeatInvitationId || null
       }
     })
 

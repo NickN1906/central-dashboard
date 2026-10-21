@@ -19,6 +19,7 @@ interface BundlePurchaseEmailData {
   productIds: string[]
   expiresAt?: Date
   oneTime?: boolean // one-time payment: say clearly that nothing renews
+  includesCoaching?: boolean // show the Heartbeat community step (A-Game, Power Pack)
   endedSubscriptions?: string[] // lines about subscriptions stopped to avoid double billing
 }
 
@@ -33,7 +34,7 @@ export async function sendBundlePurchaseEmail(data: BundlePurchaseEmailData): Pr
     return false
   }
 
-  const { customerEmail, customerName, bundleName, productIds, expiresAt, oneTime, endedSubscriptions = [] } = data
+  const { customerEmail, customerName, bundleName, productIds, expiresAt, oneTime, endedSubscriptions = [], includesCoaching = true } = data
   const name = customerName || 'there'
 
   // Format expiry date if provided
@@ -65,6 +66,7 @@ export async function sendBundlePurchaseEmail(data: BundlePurchaseEmailData): Pr
         hasRezume,
         hasAICoach,
         hasCareerPathways,
+        includesCoaching,
         customerEmail
       })
     })
@@ -89,6 +91,7 @@ interface EmailHtmlData {
   hasRezume: boolean
   hasAICoach: boolean
   hasCareerPathways: boolean
+  includesCoaching: boolean
   customerEmail: string
 }
 
@@ -105,7 +108,7 @@ const LOGOS = {
 }
 
 function generateBundleEmailHtml(data: EmailHtmlData): string {
-  const { name, bundleName, expiryText, hasRezume, hasAICoach, hasCareerPathways, customerEmail } = data
+  const { name, bundleName, expiryText, hasRezume, hasAICoach, hasCareerPathways, includesCoaching, customerEmail } = data
 
   // Build product sections
   let productSections = ''
@@ -194,7 +197,8 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
     stepNumber++
   }
 
-  // Always include Heartbeat Community as a step
+  // Heartbeat (live coaching & workshops) only for packages that include coaching
+  if (includesCoaching) {
   productSections += `
     <table cellpadding="0" cellspacing="0" border="0" width="100%" style="margin-bottom: 25px;">
       <tr>
@@ -242,6 +246,7 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
     </table>
   `
   stepNumber++
+  }
 
   if (hasCareerPathways) {
     const guideFeatures = `

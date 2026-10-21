@@ -9,6 +9,7 @@ import {
 import { sendBundlePurchaseEmail } from './email.service'
 import { grantAccessAndSync, revokeAccessAndSync, scheduleCancellationOnApp } from './app-sync.service'
 import { syncContactToZohoAsync } from './zoho.service'
+import { inviteToHeartbeat } from './heartbeat.service'
 import { DurationType } from '@/lib/types'
 
 let _stripe: Stripe | null = null
@@ -161,6 +162,25 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     ? await endOverlappingSubscriptions(identity.id, customerEmail, bundle.productIds)
     : []
 
+  // Coaching bundles: approve the buyer on the bundle's Heartbeat sign-up link
+  // so Heartbeat sends them their community invite (no manual step).
+  if (bundle.heartbeatInvitationId) {
+    const invite = await inviteToHeartbeat(customerEmail, bundle.heartbeatInvitationId)
+    await prisma.auditLog.create({
+      data: {
+        action: invite.success ? 'heartbeat_invite' : 'heartbeat_invite_failed',
+        identityId: identity.id,
+        productIds: bundle.productIds,
+        details: {
+          email: customerEmail,
+          bundleId: bundle.id,
+          invitationId: bundle.heartbeatInvitationId,
+          ...(invite.success ? {} : { error: invite.error, status: invite.status })
+        }
+      }
+    })
+  }
+
   // Send confirmation email with instructions
   await sendBundlePurchaseEmail({
     customerEmail,
@@ -169,7 +189,8 @@ export async function handleCheckoutCompleted(session: Stripe.Checkout.Session) 
     productIds: bundle.productIds,
     expiresAt,
     oneTime: isOneTime,
-    endedSubscriptions
+    endedSubscriptions,
+    includesCoaching: !!bundle.heartbeatInvitationId
   })
 
   // Sync access to connected apps (Rezume, AI Coach)

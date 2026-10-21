@@ -86,9 +86,8 @@ export async function GET(request: NextRequest) {
       automatic_tax: { enabled: true },
       // Enable coupon/promo codes at checkout
       allow_promotion_codes: allowPromotionCodes,
-      // customer_creation / invoice_creation only work in payment mode. The
-      // invoice gives one-time buyers a proper receipt showing the tax charged.
-      ...(isSubscription ? {} : { customer_creation: 'always', invoice_creation: { enabled: true } }),
+      // customer_creation only works in payment mode, not subscription mode
+      ...(isSubscription ? {} : { customer_creation: 'always' }),
     })
 
     if (!session.url) {

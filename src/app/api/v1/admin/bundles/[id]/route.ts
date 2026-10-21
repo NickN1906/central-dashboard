@@ -71,6 +71,7 @@ export async function PUT(
       durationType,
       durationValue,
       kind,
+      heartbeatInvitationId,
       isActive
     } = body
 
@@ -117,6 +118,7 @@ export async function PUT(
         ...(durationType !== undefined && { durationType }),
         ...(durationValue !== undefined && { durationValue }),
         ...(kind !== undefined && { kind }),
+        ...(heartbeatInvitationId !== undefined && { heartbeatInvitationId: heartbeatInvitationId || null }),
         ...(isActive !== undefined && { isActive })
       }
     })

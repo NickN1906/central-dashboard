@@ -95,6 +95,7 @@ export interface BundleWithStats {
   durationType: string
   durationValue: number | null
   kind: string
+  heartbeatInvitationId: string | null
   isActive: boolean
   _count: {
     entitlements: number

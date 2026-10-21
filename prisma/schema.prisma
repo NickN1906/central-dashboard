@@ -52,6 +52,11 @@ model Bundle {
   // 'plan'   = a single app's one-time plan sold through Central (e.g. Rezume 6 months).
   // Drives customer-facing wording (emails) and Zoho Membership_Type (Paid vs Bundle).
   kind          String   @default("bundle")
+  // Heartbeat invitation (sign-up link) for bundles that include live coaching
+  // (A-Game, Power Pack, National Bank). When set, buyers are auto-approved on
+  // it and Heartbeat emails them an invite; when null there is no coaching and
+  // the purchase email has no Heartbeat step.
+  heartbeatInvitationId String? @map("heartbeat_invitation_id")
   isActive      Boolean  @default(true) @map("is_active")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")

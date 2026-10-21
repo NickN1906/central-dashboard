@@ -213,6 +213,9 @@ export async function grantAccess(params: {
           data: {
             bundleId,
             expiresAt,
+            // Re-granting is a new purchase/grant: show its date, not the
+            // date this row was first created (admin view, Zoho "latest bundle").
+            grantedAt: new Date(),
             stripeSubscriptionId,
             stripePriceId,
             amountPaid,
