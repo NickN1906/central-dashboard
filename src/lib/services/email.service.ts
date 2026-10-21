@@ -284,6 +284,11 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
   }
 
   const totalSteps = stepNumber - 1
+  // A single-app plan (e.g. "Rezume Pro — 6 Months") isn't a set of products.
+  const productCount = [hasRezume, hasAICoach, hasCareerPathways].filter(Boolean).length
+  const accessLine = productCount > 1
+    ? `Your access to all products in the <span style="color: #DB1818; font-weight: 700;">${bundleName}</span> is now active.`
+    : `Your <span style="color: #DB1818; font-weight: 700;">${bundleName}</span> access is now active.`
 
   return `
     <!DOCTYPE html>
@@ -312,8 +317,7 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
             <h2 style="font-size: 22px; font-weight: 700; margin: 0 0 12px 0; color: #332D2D;">Hi ${name}!</h2>
 
             <p style="font-size: 15px; color: #332D2D; margin: 0 0 10px 0; line-height: 1.5;">
-              Thank you for your purchase! Your access to all products in the
-              <span style="color: #DB1818; font-weight: 700;">${bundleName}</span> is now active.
+              Thank you for your purchase! ${accessLine}
             </p>
 
             ${expiryText ? `
@@ -329,7 +333,7 @@ function generateBundleEmailHtml(data: EmailHtmlData): string {
             </div>
 
             <!-- Getting Started -->
-            <h2 style="font-size: 20px; font-weight: 700; margin: 25px 0 15px 0; color: #332D2D;">Getting Started (${totalSteps} Easy Steps)</h2>
+            <h2 style="font-size: 20px; font-weight: 700; margin: 25px 0 15px 0; color: #332D2D;">Getting Started (${totalSteps} Easy Step${totalSteps === 1 ? '' : 's'})</h2>
 
             ${productSections}
 
